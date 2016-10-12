@@ -7,11 +7,11 @@
  * $Rev:
  * $Date: 2015-11-04 $
  ******************************************************************************
- * Copyright 2016 Semiconductor Components Industries LLC (d/b/a “ON Semiconductor”).
+ * Copyright 2016 Semiconductor Components Industries LLC (d/b/a ï¿½ON Semiconductorï¿½).
  * All rights reserved.  This software and/or documentation is licensed by ON Semiconductor
  * under limited terms and conditions.  The terms and conditions pertaining to the software
  * and/or documentation are available at http://www.onsemi.com/site/pdf/ONSEMI_T&C.pdf
- * (“ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Software”) and
+ * (ï¿½ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Softwareï¿½) and
  * if applicable the software license agreement.  Do not use this software and/or
  * documentation unless you have carefully read and you agree to the limited terms and
  * conditions.  By using this software and/or documentation, you agree to the limited
@@ -110,7 +110,7 @@ void gpio_init(gpio_t *obj, PinName pin)
     PadReg_t *PadRegOffset = (PadReg_t*)(PADREG_BASE + (pin * PAD_REG_ADRS_BYTE_SIZE));
 
     /* - Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 
     /** - Enable the clock for PAD peripheral device */
     CLOCK_ENABLE(CLOCK_PAD);
@@ -152,7 +152,7 @@ void gpio_dir(gpio_t *obj, PinDirection direction)
     }
 
     /* - Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 }
 
 /** Set the output value
@@ -173,7 +173,7 @@ void gpio_write(gpio_t *obj, int value)
     }
 
     /* - Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 }
 
 /** Read the input value
@@ -191,7 +191,7 @@ int gpio_read(gpio_t *obj)
     ret = (obj->GPIOMEMBASE->R_STATE_W_SET & obj->gpioMask) ? 1: 0;
 
     /* - Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 
     return ret;
 }

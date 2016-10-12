@@ -34,7 +34,7 @@ class ARM(mbedToolchain):
 
     DEFAULT_FLAGS = {
         'common': ["-c", "--gnu",
-            "-Otime", "--split_sections", "--apcs=interwork",
+            "-Ospace", "--split_sections", "--apcs=interwork",
             "--brief_diagnostics", "--restrict", "--multibyte_chars"],
         'asm': [],
         'c': ["--md", "--no_depend_system_headers", "--c99", "-D__ASSERT_MSG"],
@@ -72,7 +72,7 @@ class ARM(mbedToolchain):
 
         if "debug-info" in self.options:
             self.flags['common'].append("-g")
-            self.flags['c'].append("-O0")
+            self.flags['c'].append("-Ospace")
         else:
             self.flags['c'].append("-O3")
 

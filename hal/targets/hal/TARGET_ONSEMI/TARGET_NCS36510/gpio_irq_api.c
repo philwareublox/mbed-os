@@ -7,11 +7,11 @@
  * $Rev:
  * $Date: 2015-11-04 $
  ******************************************************************************
- * Copyright 2016 Semiconductor Components Industries LLC (d/b/a “ON Semiconductor”).
+ * Copyright 2016 Semiconductor Components Industries LLC (d/b/a ï¿½ON Semiconductorï¿½).
  * All rights reserved.  This software and/or documentation is licensed by ON Semiconductor
  * under limited terms and conditions.  The terms and conditions pertaining to the software
  * and/or documentation are available at http://www.onsemi.com/site/pdf/ONSEMI_T&C.pdf
- * (“ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Software”) and
+ * (ï¿½ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Softwareï¿½) and
  * if applicable the software license agreement.  Do not use this software and/or
  * documentation unless you have carefully read and you agree to the limited terms and
  * conditions.  By using this software and/or documentation, you agree to the limited
@@ -114,7 +114,7 @@ void fGpioHandler(void)
                     event = IRQ_NONE;
                 }
             }
-            gpioBase->IRQ_CLEAR |= (0x1 << index);
+            gpioBase->IRQ_CLEAR = (0x1 << index);
 
             /* Call the handler registered to the pin */
             irq_handler(gpioIds[index], event);
@@ -152,15 +152,11 @@ int gpio_irq_init(gpio_irq_t *obj, PinName pin, gpio_irq_handler handler, uint32
     obj->GPIOMEMBASE = GPIOREG;
 
     /* Set default values for the pin interrupt */
-    /* TODO: Only one DIO line is configured using this function; overrides other DIO line setting
-     * If mbed layer wants to call this function repeatedly for setting multiple DIO lines as input
-     * then change this setting to  obj->GPIOMEMBASE->W_IN |= obj->pinMask. All parameter setting needs to change from = to |=
-     */
     obj->GPIOMEMBASE->W_IN = obj->pinMask;
-    obj->GPIOMEMBASE->IRQ_ENABLE_SET = obj->pinMask;
+    obj->GPIOMEMBASE->IRQ_ENABLE_CLEAR = obj->pinMask;
     obj->GPIOMEMBASE->IRQ_EDGE = obj->pinMask;
     obj->GPIOMEMBASE->IRQ_POLARITY_SET = (obj->pinMask);
-    obj->GPIOMEMBASE->ANYEDGE_SET = IO_NONE;
+    obj->GPIOMEMBASE->ANYEDGE_CLEAR = (obj->pinMask);
 
     /* Register the handler for this pin */
     irq_handler = handler;
@@ -181,7 +177,7 @@ void gpio_irq_free(gpio_irq_t *obj)
     /* Enable the GPIO clock */
     CLOCK_ENABLE(CLOCK_GPIO);
 
-    obj->GPIOMEMBASE->W_IN = (IO_ALL ^ (obj->pinMask));
+    obj->GPIOMEMBASE->IRQ_ENABLE_CLEAR = obj->pinMask;
     gpioIds[obj->pin] = 0;
 }
 
@@ -200,35 +196,25 @@ void gpio_irq_set(gpio_irq_t *obj, gpio_irq_event event, uint32_t enable)
     switch(event) {
         case IRQ_RISE:
             obj->GPIOMEMBASE->IRQ_EDGE = (obj->pinMask);
-            obj->GPIOMEMBASE->IRQ_LEVEL = (IO_ALL ^ (obj->pinMask));
-            /* Enable is an integer; hence checking for 1 or 0*/
-            if (enable == 1) {
-                /* Enable rising edge */
-                obj->GPIOMEMBASE->IRQ_POLARITY_SET = (obj->pinMask);
-            } else if (enable == 0) {
-                /* Disable rising edge */
-                obj->GPIOMEMBASE->IRQ_POLARITY_SET = (IO_ALL ^ (obj->pinMask));
-            }
+            obj->GPIOMEMBASE->IRQ_POLARITY_SET = (obj->pinMask);
             break;
 
         case IRQ_FALL:
             obj->GPIOMEMBASE->IRQ_EDGE = (obj->pinMask);
-            obj->GPIOMEMBASE->IRQ_LEVEL = (IO_ALL ^ (obj->pinMask));
-            /* Enable is an integer; hence checking for 1 or 0*/
-            if (enable == 1) {
-                /* Enable falling edge */
-                obj->GPIOMEMBASE->IRQ_POLARITY_CLEAR = (obj->pinMask);
-            } else if (enable == 0) {
-                /* Disable falling edge */
-                obj->GPIOMEMBASE->IRQ_POLARITY_CLEAR = (IO_ALL ^ (obj->pinMask));
-            }
-            break;
+            obj->GPIOMEMBASE->IRQ_POLARITY_CLEAR = (obj->pinMask);
+             break;
 
         default:
             /* No event is set */
+            enable = 0;
             break;
     }
 
+    if (enable) {
+        obj->GPIOMEMBASE->IRQ_ENABLE_SET = (obj->pinMask);
+    } else {
+        obj->GPIOMEMBASE->IRQ_ENABLE_CLEAR = (obj->pinMask);
+    }
 }
 
 /** Enable GPIO IRQ

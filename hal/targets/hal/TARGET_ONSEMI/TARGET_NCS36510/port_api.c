@@ -7,11 +7,11 @@
  * $Rev:
  * $Date:
  ******************************************************************************
- * Copyright 2016 Semiconductor Components Industries LLC (d/b/a “ON Semiconductor”).
+ * Copyright 2016 Semiconductor Components Industries LLC (d/b/a ï¿½ON Semiconductorï¿½).
  * All rights reserved.  This software and/or documentation is licensed by ON Semiconductor
  * under limited terms and conditions.  The terms and conditions pertaining to the software
  * and/or documentation are available at http://www.onsemi.com/site/pdf/ONSEMI_T&C.pdf
- * (“ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Software”) and
+ * (ï¿½ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Softwareï¿½) and
  * if applicable the software license agreement.  Do not use this software and/or
  * documentation unless you have carefully read and you agree to the limited terms and
  * conditions.  By using this software and/or documentation, you agree to the limited
@@ -117,7 +117,7 @@ void port_dir(port_t *obj, PinDirection dir)
     }
 
     /* Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 }
 
 /** Write value to the port
@@ -130,11 +130,11 @@ void port_write(port_t *obj, int value)
     /* Enable the GPIO clock */
     CLOCK_ENABLE(CLOCK_GPIO);
 
-    obj->GPIOMEMBASE->R_STATE_W_SET = value;//(obj->mask & value);
-    obj->GPIOMEMBASE->R_IRQ_W_CLEAR = ~value;//(obj->mask ^ value);
+    obj->GPIOMEMBASE->R_STATE_W_SET = obj->mask & value;
+    obj->GPIOMEMBASE->R_IRQ_W_CLEAR = obj->mask &~ value;
 
     /* Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 }
 
 /** Read the current value on the port
@@ -152,9 +152,9 @@ int port_read(port_t *obj)
     gpio_level = obj->GPIOMEMBASE->R_STATE_W_SET;
 
     /* Disable the GPIO clock */
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 
-    return(gpio_level);
+    return(gpio_level & obj->mask);
 }
 
 #endif

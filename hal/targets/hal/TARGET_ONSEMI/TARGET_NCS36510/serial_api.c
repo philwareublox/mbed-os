@@ -7,11 +7,11 @@
 * $Rev: 0.1 $
 * $Date: 2015-11-04 05:30:00 +0530 (Wed, 04 Nov 2015) $
 ******************************************************************************
- * Copyright 2016 Semiconductor Components Industries LLC (d/b/a “ON Semiconductor”).
+ * Copyright 2016 Semiconductor Components Industries LLC (d/b/a ï¿½ON Semiconductorï¿½).
  * All rights reserved.  This software and/or documentation is licensed by ON Semiconductor
  * under limited terms and conditions.  The terms and conditions pertaining to the software
  * and/or documentation are available at http://www.onsemi.com/site/pdf/ONSEMI_T&C.pdf
- * (“ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Software”) and
+ * (ï¿½ON Semiconductor Standard Terms and Conditions of Sale, Section 8 Softwareï¿½) and
  * if applicable the software license agreement.  Do not use this software and/or
  * documentation unless you have carefully read and you agree to the limited terms and
  * conditions.  By using this software and/or documentation, you agree to the limited
@@ -137,7 +137,7 @@ void serial_init(serial_t *obj, PinName tx, PinName rx)
 
     CLOCK_DISABLE(CLOCK_PAD);
     CLOCK_DISABLE(CLOCK_CROSSB);
-    CLOCK_DISABLE(CLOCK_GPIO);
+    //CLOCK_DISABLE(CLOCK_GPIO);
 
     /* Set the divisor value.  To do so, LCR[7] needs to be set to 1 in order to access the divisor registers.
      * The right-shift of 4 is a division of 16, representing the oversampling rate. */

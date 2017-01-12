@@ -12,22 +12,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-#ifndef CELLULAR_INTERFACE_H
-#define CELLULAR_INTERFACE_H
- 
-#include "netsocket/NetworkInterface.h"
- 
 
-/** CellularInterface class
- *
- *  Common interface that is shared between Cellular interfaces
- */
-class CellularInterface : public NetworkInterface
+#include "CellularIPStack.h"
+#include "rtos.h"
+
+CellularIPStack * CellularIPStack::_cellular_stack;
+
+CellularIPStack * CellularIPStack::get_stack()
 {
-};
+    //nanostack_lock();
 
- 
-#endif
+    if (NULL == _cellular_stack) {
+        _cellular_stack = new CellularIPStack();
+    }
 
-/** @}*/
+ //   nanostack_unlock();
+
+    return _cellular_stack;
+}
+
+
+
+

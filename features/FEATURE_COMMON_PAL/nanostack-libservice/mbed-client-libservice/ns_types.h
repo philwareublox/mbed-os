@@ -45,16 +45,19 @@
  * internal and external use, for finer control? Not yet, but maybe...)
  */
 
-/* Make sure <stdint.h> defines its macros if C++ */
+/* Make sure <inttypes.h> defines its macros if C++ */
 #ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
 #endif
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS
 #endif
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
 
 #include <stddef.h>
-#include <inttypes.h> // includes <stdint.h>; debugf() users need PRIu32 etc
+#include <inttypes.h> // includes <stdint.h>; tr_debug() users need PRIu32 etc
 #include <stdbool.h>
 
 /*
@@ -70,6 +73,10 @@ typedef uint_least32_t uint_least24_t;
 #define PRIuLEAST24 PRIuLEAST32
 #define PRIxLEAST24 PRIxLEAST32
 #define PRIXLEAST24 PRIXLEAST32
+#define SCNoLEAST24 SCNoLEAST32
+#define SCNuLEAST24 SCNuLEAST32
+#define SCNxLEAST24 SCNxLEAST32
+#define SCNXLEAST24 SCNXLEAST32
 #endif
 
 #ifndef INT24_LEAST_MAX
@@ -79,6 +86,8 @@ typedef int_least32_t int_least24_t;
 #define INT24_C(x) INT32_C(x)
 #define PRIdLEAST24 PRIdLEAST32
 #define PRIiLEAST24 PRIiLEAST32
+#define SCNdLEAST24 SCNdLEAST32
+#define SCNiLEAST24 SCNiLEAST32
 #endif
 
 #ifndef UINT24_FAST_MAX
@@ -88,6 +97,10 @@ typedef uint_fast32_t uint_fast24_t;
 #define PRIuFAST24 PRIuFAST32
 #define PRIxFAST24 PRIxFAST32
 #define PRIXFAST24 PRIXFAST32
+#define SCNoFAST24 SCNoFAST32
+#define SCNuFAST24 SCNuFAST32
+#define SCNxFAST24 SCNxFAST32
+#define SCNXFAST24 SCNXFAST32
 #endif
 
 #ifndef INT24_FAST_MAX
@@ -96,6 +109,8 @@ typedef int_fast32_t int_fast24_t;
 #define INT_FAST24_MAX INT_FAST32_MAX
 #define PRIdFAST24 PRIdFAST32
 #define PRIiFAST24 PRIiFAST32
+#define SCNdFAST24 SCNdFAST32
+#define SCNiFAST24 SCNiFAST32
 #endif
 
 /* Function attribute - C11 "noreturn" or C++11 "[[noreturn]]" */

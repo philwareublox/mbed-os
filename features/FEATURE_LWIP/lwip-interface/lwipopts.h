@@ -231,6 +231,11 @@
 
 #define LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS 1
 
+#define PPP_SUPPORT                     1
+#define CHAP_SUPPORT                    1
+//Hate the config hassle.
+//#define LWIP_USE_EXTERNAL_MBEDTLS       1
+
 #if LWIP_TRANSPORT_ETHERNET
 
 // Broadcast

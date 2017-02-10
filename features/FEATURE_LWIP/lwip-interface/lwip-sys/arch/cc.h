@@ -35,6 +35,10 @@
 #include <stdint.h>
 #include <stddef.h> /* for size_t */
 
+#if LWIP_USE_EXTERNAL_MBEDTLS
+#include "mbedtls/md5.h"
+#endif
+
 /* Types based on stdint.h */
 typedef uint8_t            u8_t; 
 typedef int8_t             s8_t; 

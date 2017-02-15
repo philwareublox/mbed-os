@@ -244,7 +244,7 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
     /* FILENAME: ":0x12345678" describes a FileHandle* */
     if (name[0] == ':') {
         void *p;
-        sscanf(name, ":%p", &p);
+        std::sscanf(name, ":%p", &p);
         res = (FileHandle*)p;
 
     /* FILENAME: "/file_system/file_name" */
@@ -405,6 +405,7 @@ extern "C" int PREFIX(_read)(FILEHANDLE fh, unsigned char *buffer, unsigned int 
     return n;
 #endif
 }
+
 
 #ifdef __ARMCC_VERSION
 extern "C" int PREFIX(_istty)(FILEHANDLE fh)
@@ -943,16 +944,30 @@ int __wrap_atexit(void (*func)()) {
 
 namespace mbed {
 
-void mbed_set_unbuffered_stream(FILE *_file) {
+static void mbed_set_unbuffered_stream(std::FILE *_file) {
 #if defined (__ICCARM__)
     char buf[2];
-    std::setvbuf(_file,buf,_IONBF,NULL);    
+    std::setvbuf(_file,buf,_IONBF,NULL);
 #else
     setbuf(_file, NULL);
 #endif
 }
 
-int mbed_getc(FILE *_file){
+std::FILE *fdopen(FileHandle *fh, const char *mode)
+{
+    char buf[12]; /* :0x12345678 + null byte */
+    std::sprintf(buf, ":%p", fh);
+    std::FILE *stream = std::fopen(buf, mode);
+    /* newlib-nano doesn't appear to ever call _isatty itself, so
+     * happily fully buffers an interactive stream. Deal with that here.
+     */
+    if (stream && fh->isatty()) {
+        mbed_set_unbuffered_stream(stream);
+    }
+    return stream;
+}
+
+int mbed_getc(std::FILE *_file){
 #if defined (__ICCARM__)
     /*This is only valid for unbuffered streams*/
     int res = std::fgetc(_file);
@@ -967,7 +982,7 @@ int mbed_getc(FILE *_file){
 #endif   
 }
 
-char* mbed_gets(char*s, int size, FILE *_file){
+char* mbed_gets(char*s, int size, std::FILE *_file){
 #if defined (__ICCARM__)
     /*This is only valid for unbuffered streams*/
     char *str = fgets(s,size,_file);

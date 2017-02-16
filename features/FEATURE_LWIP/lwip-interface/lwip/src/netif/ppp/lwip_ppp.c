@@ -583,6 +583,10 @@ static err_t ppp_netif_output(struct netif *netif, struct pbuf *pb, u16_t protoc
   }
 #endif /* CCP_SUPPORT */
 
+#if PRINTPKT_SUPPORT
+  ppp_dump_packet(pcb, "sent", (unsigned char *)pb->payload, pb->len);
+#endif /* PRINTPKT_SUPPORT */
+
   err = pcb->link_cb->netif_output(pcb, pcb->link_ctx_cb, pb, protocol);
   goto err;
 

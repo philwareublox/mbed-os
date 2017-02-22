@@ -255,6 +255,7 @@ restart:
         _buffer[offset++] = 'n';
         _buffer[offset++] = 0;
 
+        //debug_if(dbg_on, "AT? %s\n", _buffer);
         // To workaround scanf's lack of error reporting, we actually
         // make two passes. One checks the validity with the modified
         // format string that only stores the matched characters (%n).
@@ -268,6 +269,7 @@ restart:
             // Receive next character
             int c = getc();
             if (c < 0) {
+                //debug_if(dbg_on, "AT(Timeout)\n");
                 return false;
             }
             // Simplify newlines (borrowed from retarget.cpp)
@@ -294,6 +296,7 @@ restart:
                     oob->cb();
 
                     if (_aborted) {
+                        debug_if(dbg_on, "AT(Aborted)\n");
                         return false;
                     }
                     // oob may have corrupted non-reentrant buffer,

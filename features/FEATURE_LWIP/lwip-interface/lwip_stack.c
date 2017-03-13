@@ -487,7 +487,9 @@ nsapi_error_t mbed_lwip_bringup(bool dhcp, bool ppp, const char *ip, const char 
     }
 
     netif_inited = true;
-    netif_is_ppp = ppp;
+    if (ppp) {
+        netif_is_ppp = ppp;
+    }
 
     netif_set_default(&lwip_netif);
     netif_set_link_callback(&lwip_netif, mbed_lwip_netif_link_irq);
@@ -542,6 +544,9 @@ nsapi_error_t mbed_lwip_bringup(bool dhcp, bool ppp, const char *ip, const char 
 
     if (!netif_is_link_up(&lwip_netif)) {
         if (sys_arch_sem_wait(&lwip_netif_linked, 15000) == SYS_ARCH_TIMEOUT) {
+            if (ppp) {
+                ppp_lwip_disconnect();
+            }
             return NSAPI_ERROR_NO_CONNECTION;
         }
     }
@@ -565,6 +570,9 @@ nsapi_error_t mbed_lwip_bringup(bool dhcp, bool ppp, const char *ip, const char 
     // If doesn't have address
     if (!mbed_lwip_get_ip_addr(true, &lwip_netif)) {
         if (sys_arch_sem_wait(&lwip_netif_has_addr, 15000) == SYS_ARCH_TIMEOUT) {
+            if (ppp) {
+                ppp_lwip_disconnect();
+            }
             return NSAPI_ERROR_DHCP_FAILURE;
         }
     }

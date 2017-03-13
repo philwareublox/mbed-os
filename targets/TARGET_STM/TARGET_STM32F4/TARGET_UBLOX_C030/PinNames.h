@@ -66,6 +66,9 @@ typedef enum {
 
     PH_0  = 0x70, PH_1  = 0x71,
     
+    // Not connected
+    NC = -1,
+
     GPSTXD = PC_6,
 	GPSRXD = PC_7,
 	// Control
@@ -79,6 +82,7 @@ typedef enum {
 	MDMRXD = PD_6, // Receive Data
 	MDMCTS = PD_3, // Clear to Send
     MDMRTS = PD_4, // Request to Send (set high or use handshake)
+    MDMDCD = NC,   // DCD line not connecetd
 	
 	// USB
 	// Control 
@@ -126,10 +130,9 @@ typedef enum {
     USBTX   = PA_9,
     SWDIO   = PA_13, 
     SWCLK   = PA_14, 
-    NTRST   = PB_4,  
+    NTRST   = PB_4
 
-    // Not connected
-    NC = (int)0xFFFFFFFF
+
 } PinName;
 #define GPSBAUD     9600    // Default GPS Baud Rate
 #define MDMBAUD     115200  // Default Modem Baud Rate

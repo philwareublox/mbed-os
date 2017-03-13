@@ -1111,7 +1111,6 @@
         "supported_toolchains": ["ARM", "uARM", "GCC_ARM"],
         "program_cycle_s": 2,
         "extra_labels": ["STM", "STM32F4", "STM32F407", "STM32F407xG", "STM32F407VG"],
-        "macros": ["LSI_VALUE=32000"],
         "inherits": ["Target"],
         "macros": ["TRANSACTION_QUEUE_SIZE_SPI=2"],
         "device_has": ["ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "RTC", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "SPI_ASYNCH", "STDIO_MESSAGES"],
@@ -1331,8 +1330,20 @@
         "device_has": ["ANALOGIN", "CAN", "EMAC", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SLEEP", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG", "FLASH"],
         "features": ["LWIP"],
         "release_versions": ["5"],
-        "device_name": "STM32F439ZI",
-        "bootloader_supported": true
+        "device_name": "STM32F439ZI"
+    },
+    "UBLOX_C030": {
+        "supported_form_factors": ["ARDUINO"],
+        "core": "Cortex-M4F",
+        "default_toolchain": "ARM",
+        "supported_toolchains": ["GCC_ARM", "ARM", "IAR"],
+        "extra_labels": ["STM", "STM32F4", "STM32F437", "STM32F437VG","STM32F437xx"],
+        "macros": ["TRANSACTION_QUEUE_SIZE_SPI=2", "RTC_LSI=1"],
+        "inherits": ["Target"],
+        "device_has": ["ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "ETHERNET", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SLEEP", "RTC", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG"],
+        "features": ["LWIP"],
+        "release_versions": ["5"],
+        "device_name": "STM32F437VG"
     },
     "NZ32_SC151": {
         "inherits": ["Target"],

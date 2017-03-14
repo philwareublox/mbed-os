@@ -29,7 +29,7 @@
 #define tr_error(...) (void(0)) //dummies if feature common pal is not added
 #endif //defined(FEATURE_COMMON_PAL)
 
-#define BAUD_RATE   115200
+#define BAUD_RATE   9600
 #define AT_PARSER_BUFFER_SIZE   256 //bytes
 #define AT_PARSER_TIMEOUT       8*1000 //miliseconds
 
@@ -765,55 +765,45 @@ void UbloxCellularInterface::PowerDownModem()
  */
 bool UbloxCellularInterface::PowerUpModem()
 {
+    bool success = false;
+    uint32_t retryCount = 0;
+    DigitalOut pwrOn(MDMPWRON, 1);
+
     /* Initialize GPIO lines */
     c030_mdm_powerOn(_useUSB);
-    wait(0.25);
+    wait_ms(250);
 
-    bool success = false;
-       // The power on call does everything except press the "power" button - this is that
-       // button. Pulse low briefly to turn it on, hold it low for 1 second to turn it off.
-       DigitalOut pwrOn(MDMPWRON, 1);
+    for (retryCount = 0; !success && (retryCount < 10); retryCount++) {
+        pwrOn = 0;
+        wait_ms(150);
+        pwrOn = 1;
+        wait_ms(100);
+        /* Modem tends to spit out noise during power up - don't confuse the parser */
+        _at->flush();
+        _at->setTimeout(1000);
+        if (_at->send("AT") && _at->recv("OK")) {
+            success = true;
+            tr_debug("cmd success.");
+        }
+    }
 
-       int retry_count = 0;
-       while(true) {
-           pwrOn = 0;
-           wait_ms(150);
-           pwrOn = 1;
-           wait_ms(100);
-           /* Modem tends to spit out noise during power up - don't confuse the parser */
-           _at->flush();
-           _at->setTimeout(1000);
-           if(_at->send("AT") && _at->recv("OK")) {
-               tr_debug("cmd success.");
-               break;
-           }
+    if (success) {
+        _at->setTimeout(8000);
 
-           if (++retry_count > 10) {
-               goto failure;
-           }
-       }
+        /* For more details regarding DCD and DTR circuitry, please refer to LISA-U2 System integration manual
+         * and Ublox AT commands manual */
+        success = _at->send("ATE0;" //turn off modem echoing
+                            "+CMEE=2;" //turn on verbose responses
+                            "+IPR=115200;" //setup baud rate
+                            "&C1;"  //set DCD circuit(109), changes in accordance with the carrier detect status
+                            "&D0") //set DTR circuit, we ignore the state change of DTR
+                  && _at->recv("OK");
+        if (!success) {
+            tr_error("Preliminary modem setup failed.");
+        }
+    }
 
-       _at->setTimeout(8000);
-
-       /*For more details regarding DCD and DTR circuitry, please refer to LISA-U2 System integration manual
-        * and Ublox AT commands manual*/
-       success = _at->send("ATE0;" //turn off modem echoing
-                           "+CMEE=2;" //turn on verbose responses
-                           "+IPR=115200;" //setup baud rate
-                           "&C1;"  //set DCD circuit(109), changes in accordance with the carrier detect status
-                           "&D0") //set DTR circuit, we ignore the state change of DTR
-              && _at->recv("OK");
-
-       if (!success) {
-           goto failure;
-       }
-
-       /* If everything alright, return from here with success*/
-       return success;
-
-failure:
-       tr_error("Preliminary modem setup failed.");
-       return false;
+    return success;
 }
 
 /**

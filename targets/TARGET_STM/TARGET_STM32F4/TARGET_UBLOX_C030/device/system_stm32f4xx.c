@@ -236,7 +236,7 @@ void SystemInit(void)
   TIM_MST_RESET_OFF;
 
   // Initialise the board
-  c030_init();
+  //c030_init();
 }
 
 /**

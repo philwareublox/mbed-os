@@ -13,35 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "gpio_api.h"
+#include "ublox_low_level_api.h"
 
-#include "C030_api.h"
+#include <stdbool.h>
+#include "gpio_api.h"
 
 static gpio_t mdmEn, mdmLvlOe, mdmILvlOe, mdmUsbDet;
 static gpio_t gpsEn,mdmPwrOn;
 
-void c030_init(void) {
-    gpio_t led, mdmRts, gpsRst, mdmPwrOn,mdmRst;
+static bool modemOn;
+static bool gpsOn;
+
+void ublox_mdm_init(void) {
+    gpio_t gpio;
     // start with modem disabled 
-    gpio_init_out_ex(&mdmEn,     MDMEN,     0);
-    gpio_init_out_ex(&mdmRst,    MDMRST,    1);
-    gpio_init_out_ex(&mdmPwrOn,  MDMPWRON,  1);
+    gpio_init_out_ex(&gpio, MDMEN,     0);
+    gpio_init_out_ex(&gpio, MDMRST,    1);
+    gpio_init_out_ex(&gpio, MDMPWRON,  1);
   
   //  gpio_init_out_ex(&mdmLvlOe,  MDMLVLOE,  1); // LVLEN:  1=disabled
   //  gpio_init_out_ex(&mdmILvlOe, MDMILVLOE, 0); // ILVLEN: 0=disabled
   //  gpio_init_out_ex(&mdmUsbDet, MDMUSBDET, 0);
-    gpio_init_out_ex(&mdmRts,    MDMRTS,    0);
+    gpio_init_out_ex(&gpio, MDMRTS,    0);
     // start with gps disabled 
-    gpio_init_out_ex(&gpsEn,     GPSEN,     0);
-    gpio_init_out_ex(&gpsRst,    GPSRST,    1);
+    gpio_init_out_ex(&gpio, GPSEN,     0);
+    gpio_init_out_ex(&gpio, GPSRST,    1);
     // led should be off
-    gpio_init_out_ex(&led,       LED,       0);
+    gpio_init_out_ex(&gpio, LED,       0);
     
    // wait_ms(50); // when USB cable is inserted the interface chip issues
 	 HAL_Delay(50); // replacing wait_ms() with equivalent hal function
 }
 
-void c030_mdm_powerOn(int usb) {
+void ublox_mdm_powerOn(int usb) {
 	gpio_t mdmPwrOn, mdmRst;
     // turn on the mode by enabling power with power on pin low and correct USB detect level
    // gpio_write(&mdmUsbDet, usb ? 1 : 0);  // USBDET: 0=disabled, 1=enabled
@@ -68,7 +72,7 @@ void c030_mdm_powerOn(int usb) {
 		*/
 }
 
-void c030_mdm_powerOff(void) {
+void ublox_mdm_powerOff(void) {
     if (gpio_read(&mdmPwrOn)) {
         /* diable all level shifters
         gpio_write(&mdmILvlOe, 0);  // ILVLEN: 0=disabled (i2c)
@@ -82,7 +86,7 @@ void c030_mdm_powerOff(void) {
 	}
 }        
 
-void c030_gps_powerOn(void) {
+void ublox_gps_powerOn(void) {
     if (!gpio_read(&gpsEn)) {
         // switch on power supply
         gpio_write(&gpsEn, 1);          // LDOEN: 1=on
@@ -94,7 +98,7 @@ void c030_gps_powerOn(void) {
     }
 }
 
-void c030_gps_powerOff(void) {
+void ublox_gps_powerOff(void) {
     if (gpio_read(&gpsEn)) {
         gpio_write(&mdmILvlOe, 0);  // ILVLEN: 0=disabled (i2c)
         gpio_write(&gpsEn, 0);      // LDOEN: 0=off

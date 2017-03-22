@@ -13,9 +13,9 @@
  * limitations under the License.
  */
 
+#include "ublox_low_level_api.h"
 #include "UbloxCellularInterface.h"
 #include "nsapi_ppp.h"
-#include "C030_api.h"
 #include "BufferedSerial.h"
 #if MBED_CONF_UBLOX_C027_APN_LOOKUP
 #include "APN_db.h"
@@ -29,7 +29,7 @@
 #define tr_error(...) (void(0)) //dummies if feature common pal is not added
 #endif //defined(FEATURE_COMMON_PAL)
 
-#define BAUD_RATE   9600
+#define BAUD_RATE   115200
 #define AT_PARSER_BUFFER_SIZE   256 //bytes
 #define AT_PARSER_TIMEOUT       8*1000 //miliseconds
 
@@ -273,9 +273,6 @@ UbloxCellularInterface::UbloxCellularInterface(bool use_USB, bool debugOn)
     _apn = "internet";
     _uname = NULL;
     _pwd = NULL;
-    memset(_ip_address, 0, NSAPI_IPv4_SIZE);
-    memset(_netmask, 0, NSAPI_IPv4_SIZE);
-    memset(_gateway, 0, NSAPI_IPv4_SIZE);
     _debug_trace_on = false;
 
     _useUSB = use_USB;
@@ -738,17 +735,17 @@ nsapi_error_t UbloxCellularInterface::disconnect()
 
 const char *UbloxCellularInterface::get_ip_address()
 {
-    return nsapi_ppp_get_ip_addr(_ip_address, NSAPI_IPv4_SIZE);
+    return nsapi_ppp_get_ip_addr(_fh);
 }
 
 const char *UbloxCellularInterface::get_netmask()
 {
-    return nsapi_ppp_get_netmask(_netmask, NSAPI_IPv4_SIZE);
+    return nsapi_ppp_get_netmask(_fh);
 }
 
 const char *UbloxCellularInterface::get_gateway()
 {
-    return nsapi_ppp_get_ip_addr(_gateway, NSAPI_IPv4_SIZE);
+    return nsapi_ppp_get_ip_addr(_fh);
 }
 
 /** Power down modem
@@ -765,45 +762,55 @@ void UbloxCellularInterface::PowerDownModem()
  */
 bool UbloxCellularInterface::PowerUpModem()
 {
-    bool success = false;
-    uint32_t retryCount = 0;
-    DigitalOut pwrOn(MDMPWRON, 1);
-
     /* Initialize GPIO lines */
-    c030_mdm_powerOn(_useUSB);
-    wait_ms(250);
+    ublox_mdm_powerOn(_useUSB);
+    wait(0.25);
 
-    for (retryCount = 0; !success && (retryCount < 10); retryCount++) {
-        pwrOn = 0;
-        wait_ms(150);
-        pwrOn = 1;
-        wait_ms(100);
-        /* Modem tends to spit out noise during power up - don't confuse the parser */
-        _at->flush();
-        _at->setTimeout(1000);
-        if (_at->send("AT") && _at->recv("OK")) {
-            success = true;
-            tr_debug("cmd success.");
-        }
-    }
+    bool success = false;
+       // The power on call does everything except press the "power" button - this is that
+       // button. Pulse low briefly to turn it on, hold it low for 1 second to turn it off.
+       DigitalOut pwrOn(MDMPWRON, 1);
 
-    if (success) {
-        _at->setTimeout(8000);
+       int retry_count = 0;
+       while(true) {
+           pwrOn = 0;
+           wait_ms(150);
+           pwrOn = 1;
+           wait_ms(100);
+           /* Modem tends to spit out noise during power up - don't confuse the parser */
+           _at->flush();
+           _at->setTimeout(1000);
+           if(_at->send("AT") && _at->recv("OK")) {
+               tr_debug("cmd success.");
+               break;
+           }
 
-        /* For more details regarding DCD and DTR circuitry, please refer to LISA-U2 System integration manual
-         * and Ublox AT commands manual */
-        success = _at->send("ATE0;" //turn off modem echoing
-                            "+CMEE=2;" //turn on verbose responses
-                            "+IPR=115200;" //setup baud rate
-                            "&C1;"  //set DCD circuit(109), changes in accordance with the carrier detect status
-                            "&D0") //set DTR circuit, we ignore the state change of DTR
-                  && _at->recv("OK");
-        if (!success) {
-            tr_error("Preliminary modem setup failed.");
-        }
-    }
+           if (++retry_count > 10) {
+               goto failure;
+           }
+       }
 
-    return success;
+       _at->setTimeout(8000);
+
+       /*For more details regarding DCD and DTR circuitry, please refer to LISA-U2 System integration manual
+        * and Ublox AT commands manual*/
+       success = _at->send("ATE0;" //turn off modem echoing
+                           "+CMEE=2;" //turn on verbose responses
+                           "+IPR=115200;" //setup baud rate
+                           "&C1;"  //set DCD circuit(109), changes in accordance with the carrier detect status
+                           "&D0") //set DTR circuit, we ignore the state change of DTR
+              && _at->recv("OK");
+
+       if (!success) {
+           goto failure;
+       }
+
+       /* If everything alright, return from here with success*/
+       return success;
+
+failure:
+       tr_error("Preliminary modem setup failed.");
+       return false;
 }
 
 /**

@@ -15,7 +15,9 @@
  */
 #include "FileHandle.h"
 #include "Timer.h"
+#ifdef MBED_CONF_RTOS_PRESENT
 #include "rtos/Thread.h"
+#endif
 #include "platform/mbed_critical.h"
 
 namespace mbed {
@@ -80,9 +82,11 @@ int mbed_poll(PollFH fhs[], unsigned nfhs, int timeout)
         if (timeout == 0 || (timeout > 0 && timer.read_ms() > timeout)) {
             break;
         }
+#ifdef MBED_CONF_RTOS_PRESENT
         // TODO - proper blocking
         // wait for condition variable, wait queue whatever here
         rtos::Thread::yield();
+#endif
     }
     return count;
 }

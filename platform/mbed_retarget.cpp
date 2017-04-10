@@ -242,7 +242,7 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
     /* FILENAME: ":0x12345678" describes a FileHandle* */
     if (name[0] == ':') {
         void *p;
-        sscanf(name, ":%p", &p);
+        std::sscanf(name, ":%p", &p);
         res = (FileHandle*)p;
 
     /* FILENAME: "/file_system/file_name" */
@@ -942,7 +942,7 @@ int __wrap_atexit(void (*func)()) {
 
 namespace mbed {
 
-static void mbed_set_unbuffered_stream(FILE *_file) {
+static void mbed_set_unbuffered_stream(std::FILE *_file) {
 #if defined (__ICCARM__)
     char buf[2];
     std::setvbuf(_file,buf,_IONBF,NULL);
@@ -965,7 +965,7 @@ std::FILE *mbed_fdopen(FileHandle *fh, const char *mode)
     return stream;
 }
 
-int mbed_getc(FILE *_file){
+int mbed_getc(std::FILE *_file){
 #if defined (__ICCARM__)
     /*This is only valid for unbuffered streams*/
     int res = std::fgetc(_file);
@@ -980,7 +980,7 @@ int mbed_getc(FILE *_file){
 #endif   
 }
 
-char* mbed_gets(char*s, int size, FILE *_file){
+char* mbed_gets(char*s, int size, std::FILE *_file){
 #if defined (__ICCARM__)
     /*This is only valid for unbuffered streams*/
     char *str = fgets(s,size,_file);

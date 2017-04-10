@@ -46,7 +46,7 @@ public:
 
     virtual int sync();
 
-    virtual size_t size();
+    virtual off_t size();
 
 protected:
     virtual void lock();

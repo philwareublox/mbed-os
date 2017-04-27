@@ -47,6 +47,10 @@ const PinMap PinMap_ADC[] = {
     {NC,   NC,    0}
 };
 
+const PinMap PinMap_ADC_Internal[] = {
+    {NC,   NC,    0}
+};
+
 //*** I2C ***
 
 
@@ -94,6 +98,18 @@ const PinMap PinMap_UART_RX[] = {
     {PD_6,  UART_2, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART2)},
     {PD_8,  UART_3, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART3)},
     {PC_7,  UART_6, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF8_USART6)},
+    {NC,    NC,     0}
+};
+
+const PinMap PinMap_UART_RTS[] = {
+    {PA_12, UART_1, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART1)},
+    {PD_4,  UART_2, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART2)},
+    {NC,    NC,     0}
+};
+
+const PinMap PinMap_UART_CTS[] = {
+    {PA_11, UART_1, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART1)},
+    {PD_3,  UART_2, STM_PIN_DATA(STM_MODE_AF_PP, GPIO_PULLUP, GPIO_AF7_USART2)},
     {NC,    NC,     0}
 };
 

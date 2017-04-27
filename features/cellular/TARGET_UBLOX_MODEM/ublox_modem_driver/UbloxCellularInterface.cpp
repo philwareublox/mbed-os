@@ -775,7 +775,7 @@ void UbloxCellularInterface::PowerDownModem()
 bool UbloxCellularInterface::PowerUpModem()
 {
     /* Initialize GPIO lines */
-    ublox_mdm_powerOn(_useUSB);
+    ublox_mdm_power_on(_useUSB);
     wait(0.25);
 
     bool success = false;

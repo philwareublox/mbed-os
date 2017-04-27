@@ -45,7 +45,7 @@ void ublox_mdm_init(void) {
     while ((us_ticker_read() - start) < 50000);
 }
 
-void ublox_mdm_powerOn(int usb) {
+void ublox_mdm_power_on(int usb) {
     gpio_t gpio;
     // turn on the mode by enabling power with power on pin low and correct USB detect level
     gpio_init_out_ex(&gpio, MDMUSBDET,  usb ? 1 : 0);  // USBDET: 0=disabled, 1=enabled
@@ -59,7 +59,7 @@ void ublox_mdm_powerOn(int usb) {
     }
 }
 
-void ublox_powerOff(void) {
+void ublox_mdm_power_off(void) {
     gpio_t gpio;
     if (modemOn) {
         // diable all level shifters
@@ -72,7 +72,7 @@ void ublox_powerOff(void) {
     }
 }        
 
-void ublox_gps_powerOn(void) {
+void ublox_gps_power_on(void) {
     gpio_t gpio;
     if (!gpsOn) {
         // switch on power supply
@@ -83,7 +83,7 @@ void ublox_gps_powerOn(void) {
     }
 }
 
-void ublox_gps_powerOff(void) {
+void ublox_gps_power_off(void) {
     gpio_t gpio;
     if (gpsOn) {
         gpio_init_out_ex(&gpio, MDMILVLOE, 0);   // ILVLEN: 0=disabled (i2c)

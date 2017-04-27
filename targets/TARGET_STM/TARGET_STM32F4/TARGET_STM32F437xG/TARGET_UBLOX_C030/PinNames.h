@@ -69,12 +69,15 @@ typedef enum {
     // Not connected
     NC = -1,
 
+    PWR3V3 = PE_0,  // 3.3V rail for the Arduino interface,
+                    // user LEDs and GNSS power, should be
+                    // set to open drain output
+    
     GNSSTXD = PC_6,
     GNSSRXD = PC_7,
     // Control
     GNSSRST = PC_10, // Reset (input to GPS, active low)
-    GNSSPWR = PE_0,  // 2.8V rail, should be set to open drain output
-    GNSSEN = PA_15,  // VCC_IO to GNSS, should be set to push-pull, no pull-up, output
+    GNSSEN  = PA_15,  // VCC_IO to GNSS, should be set to push-pull, no pull-up, output
     // u-blox LISA/SARA cellular modem
     // http://www.u-blox.com/wireless-modules.html
     // -----------------------------------------------------------

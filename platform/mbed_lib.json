@@ -21,11 +21,11 @@
             "value": 9600
         },
         "buffered-serial-txbuf-size": {
-          	"help": "Default TX buffer size for the BufferedSerial instance (unit Bytes))",
+            "help": "Default TX buffer size for a BufferedSerial instance (unit Bytes))",
             "value": 256
         },
         "buffered-serial-rxbuf-size": {
-            "help": "Default TX buffer size for the BufferedSerial instance (unit Bytes))",
+            "help": "Default RX buffer size for a BufferedSerial instance (unit Bytes))",
             "value": 256
         }
     },

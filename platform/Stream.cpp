@@ -20,7 +20,7 @@ namespace mbed {
 Stream::Stream(const char *name) : FileLike(name), _file(NULL) {
     // No lock needed in constructor
     /* open ourselves */
-    _file = mbed_fdopen(this, "w+");
+    _file = fdopen(this, "w+");
 }
 
 Stream::~Stream() {

@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include "platform/BufferedSerial.h"
+#include "platform/mbed_poll.h"
 #ifdef MBED_CONF_RTOS_PRESENT
 #include "rtos/rtos.h"
 #endif
@@ -41,7 +42,7 @@ BufferedSerial::~BufferedSerial()
 
 void BufferedSerial::DCD_IRQ()
 {
-    _poll_change(MBED_POLLHUP);
+    _poll_change(this);
 }
 
 void BufferedSerial::set_data_carrier_detect(PinName DCD_pin, bool active_high)
@@ -182,14 +183,14 @@ short BufferedSerial::poll(short events) const {
 
 
     if (!_rxbuf.empty()) {
-        revents |= MBED_POLLIN;
+        revents |= POLLIN;
     }
 
     /* POLLHUP and POLLOUT are mutually exclusive */
     if (HUP()) {
-        revents |= MBED_POLLHUP;
+        revents |= POLLHUP;
     } else if (!_txbuf.full()) {
-        revents |= MBED_POLLOUT;
+        revents |= POLLOUT;
     }
 
     /*TODO Handle other event types */
@@ -217,13 +218,14 @@ void BufferedSerial::RxIRQ(void)
         char data = SerialBase::_base_getc();
         if (!_rxbuf.full()) {
             _rxbuf.push(data);
+        } else {
             /* Drop - can we report in some way? */
         }
     }
 
     /* Report the File handler that data is ready to be read from the buffer. */
     if (was_empty && !_rxbuf.empty()) {
-        _poll_change(MBED_POLLIN);
+        _poll_change(this);
     }
 }
 
@@ -247,7 +249,7 @@ void BufferedSerial::TxIRQ(void)
 
     /* Report the File handler that data can be written to peripheral. */
     if (was_full && !_txbuf.full() && !HUP()) {
-        _poll_change(MBED_POLLOUT);
+        _poll_change(this);
     }
 }
 

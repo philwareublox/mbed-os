@@ -19,22 +19,21 @@
  */
 
 #include "ATParser.h"
+#include "mbed_poll.h"
 #include "mbed_debug.h"
 
 #define LF 10
 #define CR 13
-
-static const char enter[] = { CR };
 
 // getc/putc handling with timeouts
 int ATParser::putc(char c)
 {
     PollFH fhs;
     fhs.fh = _fh;
-    fhs.events = MBED_POLLOUT;
+    fhs.events = POLLOUT;
 
-    int count = mbed_poll(&fhs, 1, _timeout);
-    if (count > 0 && (fhs.revents & MBED_POLLOUT)) {
+    int count = poll(&fhs, 1, _timeout);
+    if (count > 0 && (fhs.revents & POLLOUT)) {
         return _fh->write(&c, 1) == 1 ? 0 : -1;
     } else {
         return -1;
@@ -57,10 +56,10 @@ int ATParser::getc()
 {
     PollFH fhs;
     fhs.fh = _fh;
-    fhs.events = MBED_POLLIN;
+    fhs.events = POLLIN;
 
-    int count = mbed_poll(&fhs, 1, _timeout);
-    if (count > 0 && (fhs.revents & MBED_POLLIN)) {
+    int count = poll(&fhs, 1, _timeout);
+    if (count > 0 && (fhs.revents & POLLIN)) {
         unsigned char ch;
         return _fh->read(&ch, 1) == 1 ? ch : -1;
     } else {
@@ -210,8 +209,8 @@ bool ATParser::vsend(const char *command, va_list args)
     }
 
     // Finish with newline
-    for (size_t i = 0; i < sizeof enter; i++) {
-        if (putc(enter[i]) < 0) {
+    for (size_t i = 0; _output_delimiter[i]; i++) {
+        if (putc(_output_delimiter[i]) < 0) {
             return false;
         }
     }

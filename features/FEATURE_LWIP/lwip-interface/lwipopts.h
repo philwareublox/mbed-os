@@ -84,18 +84,28 @@
 #define DEFAULT_RAW_RECVMBOX_SIZE   8
 #define DEFAULT_ACCEPTMBOX_SIZE     8
 
+// Thread stack size for lwip tcpip thread
+#ifndef MBED_CONF_LWIP_TCPIP_THREAD_STACKSIZE
+#define MBED_CONF_LWIP_TCPIP_THREAD_STACKSIZE      1200
+#endif
+
 #if LWIP_DEBUG
-#define TCPIP_THREAD_STACKSIZE      1200*3
+#define TCPIP_THREAD_STACKSIZE      MBED_CONF_LWIP_TCPIP_THREAD_STACKSIZE*2
 #else
-#define TCPIP_THREAD_STACKSIZE      1200*2
+#define TCPIP_THREAD_STACKSIZE      MBED_CONF_LWIP_TCPIP_THREAD_STACKSIZE
 #endif
 
 #define TCPIP_THREAD_PRIO           (osPriorityNormal)
 
+// Thread stack size for lwip system threads
+#ifndef MBED_CONF_LWIP_DEFAULT_THREAD_STACKSIZE
+#define MBED_CONF_LWIP_DEFAULT_THREAD_STACKSIZE    512
+#endif
+
 #if LWIP_DEBUG
-#define DEFAULT_THREAD_STACKSIZE    512*3
+#define DEFAULT_THREAD_STACKSIZE    MBED_CONF_LWIP_DEFAULT_THREAD_STACKSIZE*2
 #else
-#define DEFAULT_THREAD_STACKSIZE    512*2
+#define DEFAULT_THREAD_STACKSIZE    MBED_CONF_LWIP_DEFAULT_THREAD_STACKSIZE
 #endif
 
 #define MEMP_NUM_SYS_TIMEOUT        16
@@ -264,6 +274,7 @@
 #define PAP_SUPPORT                 0
 #define VJ_SUPPORT                  0
 #define PRINTPKT_SUPPORT            0
+#define PPP_LOGIT_BUFSIZE           512
 
 //Hate the config hassle.
 //#define LWIP_USE_EXTERNAL_MBEDTLS       1

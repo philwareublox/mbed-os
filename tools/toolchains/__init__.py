@@ -474,7 +474,7 @@ class mbedToolchain:
             # This is a policy decision and it should /really/ be in the config system
             # ATM it's here for backward compatibility
             if ((("-g" in self.flags['common'] or "-g3" in self.flags['common']) and
-                 "-O0") in self.flags['common'] or
+                 "-O0" in self.flags['common']) or
                 ("-r" in self.flags['common'] and
                  "-On" in self.flags['common'])):
                 self.labels['TARGET'].append("DEBUG")
@@ -612,6 +612,7 @@ class mbedToolchain:
                             break
 
             # Add root to include paths
+            root = root.rstrip("/")
             resources.inc_dirs.append(root)
             resources.file_basepath[root] = base_path
 
@@ -1391,6 +1392,19 @@ class mbedToolchain:
     # Return the list of macros geenrated by the build system
     def get_config_macros(self):
         return Config.config_to_macros(self.config_data) if self.config_data else []
+
+    @property
+    def report(self):
+        to_ret = {}
+        to_ret['c_compiler'] = {'flags': copy(self.flags['c']),
+                                'symbols': self.get_symbols()}
+        to_ret['cxx_compiler'] = {'flags': copy(self.flags['cxx']),
+                                  'symbols': self.get_symbols()}
+        to_ret['assembler'] = {'flags': copy(self.flags['asm']),
+                               'symbols': self.get_symbols(True)}
+        to_ret['linker'] = {'flags': copy(self.flags['ld'])}
+        to_ret.update(self.config.report)
+        return to_ret
 
 from tools.settings import ARM_PATH
 from tools.settings import GCC_ARM_PATH

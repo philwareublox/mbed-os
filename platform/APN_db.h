@@ -13,6 +13,7 @@
    google: https://www.google.de/search?q=APN+list   
 ---------------------------------------------------------------- */
 
+
 //! helper to generate the APN string
 #define _APN(apn,username,password) apn "\0" username "\0" password "\0"
 
@@ -120,7 +121,7 @@ inline const char* apnconfig(const char* imsi)
     if (imsi && *imsi) {
         // many carriers use internet without username and password, os use this as default
         // now try to lookup the setting for our table
-        for (unsigned int i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
+        for (int i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
             const char* p = apnlut[i].mccmnc;
             // check the MCC
             if ((0 == memcmp(imsi, p, 3))) {
@@ -142,3 +143,4 @@ inline const char* apnconfig(const char* imsi)
         config = apndef;
     return config;
 }
+

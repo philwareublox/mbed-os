@@ -19,18 +19,6 @@
 
 #include "platform/platform.h"
 
-/** Software buffer size for
- *  Serial TX*/
-#ifndef SW_SERIAL_TX_BUF
-#define SW_SERIAL_TX_BUF    500
-#endif //SW_SERIAL_TX_BUF
-
-/** Software buffer size for
- *  Serial RX*/
-#ifndef SW_SERIAL_RX_BUF
-#define SW_SERIAL_RX_BUF    500
-#endif //SW_SERIAL_RX_BUF
-
 #if DEVICE_SERIAL
 
 #include "FileHandle.h"
@@ -81,7 +69,7 @@ public:
 private:
 
     /** Software serial buffers
-     *  By default buffer size is 2K for TX and 2K for RX. Configurable through mbed_app.json
+     *  By default buffer size is 256 for TX and 256 for RX. Configurable through mbed_app.json
      */
 
     CircularBuffer<char, MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE> _rxbuf;

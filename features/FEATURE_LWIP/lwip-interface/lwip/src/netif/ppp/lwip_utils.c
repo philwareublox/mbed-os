@@ -605,7 +605,11 @@ void ppp_print_string(const u_char *p, int len, void (*printer) (void *, const c
  * ppp_logit - does the hard work for fatal et al.
  */
 static void ppp_logit(int level, const char *fmt, va_list args) {
-    static char buf[512];
+#ifdef PPP_LOGIT_BUFSIZE
+    char buf[PPP_LOGIT_BUFSIZE];
+#else
+    char buf[1024];
+#endif
 
     ppp_vslprintf(buf, sizeof(buf), fmt, args);
     ppp_log_write(level, buf);
@@ -707,7 +711,6 @@ void ppp_dbglog(const char *fmt, ...) {
 void ppp_dump_packet(ppp_pcb *pcb, const char *tag, unsigned char *p, int len) {
     int proto;
 
-#if 0
     /*
      * don't print data packets, i.e. IPv4, IPv6, VJ, and compressed packets.
      */
@@ -726,7 +729,6 @@ void ppp_dump_packet(ppp_pcb *pcb, const char *tag, unsigned char *p, int len) {
 	    && l >= HEADERLEN && l <= len - 2)
 	    return;
     }
-#endif
 
     ppp_dbglog("%s %P", tag, p, len);
 }

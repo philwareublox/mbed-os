@@ -136,70 +136,65 @@ typedef struct {
 /* Forward declaration */
 class NetworkStack;
 
-/** UbloxCellularInterface class
+/** UbloxCellularInterface class.
  *
  *  This interface serves as the controller/driver for the u-blox
- *  C027 and C030 boards.
+ *  C030 board.
  */
 class UbloxCellularInterface : public CellularInterface {
 
 public:
     UbloxCellularInterface(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE, bool use_USB = false);
     ~UbloxCellularInterface();
-    /** Initialise the modem, ready for use
-     *
-     *  If either of the add_remove_sim_pin_check() or change_sim_pin()
-     *  methods have been called before init() then they will take
-     *  effect when init() is called.
+    /** Initialise the modem, ready for use.
      *
      *  @param sim_pin     PIN for the SIM card.
-     *  @return            NSAPI_ERROR_OK on success, or negative error code on failure
+     *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
      */
     virtual nsapi_error_t init(const char *sim_pin = 0);
 
-    /** Put the modem into its lowest power state
+    /** Put the modem into its lowest power state.
      */
     virtual void deinit();
 
-    /** Set the Cellular network credentials
+    /** Set the Cellular network credentials.
      *
      *  Please check documentation of connect() for default behaviour of APN settings.
      *
-     *  @param apn      Access point name
-     *  @param uname    optionally, username
-     *  @param pwd      optionally, password
+     *  @param apn      Access point name.
+     *  @param uname    optionally, username.
+     *  @param pwd      optionally, password.
      */
     virtual void set_credentials(const char *apn, const char *uname = 0,
                                  const char *pwd = 0);
 
-    /** Set the pin code for SIM card
+    /** Set the PIN code for the SIM card.
      *
-     *  @param sim_pin      PIN for the SIM card
+     *  @param sim_pin      PIN for the SIM card.
      */
     virtual void  set_SIM_pin(const char *sim_pin);
 
-    /** Start the interface
+    /** Connect to the cellular network and start the interface.
      *
      *  Attempts to connect to a Cellular network.  Note: if init() has
      *  not been called beforehand, connect() will call it first.
      *
-     *  @param sim_pin     PIN for the SIM card
-     *  @param apn         optionally, access point name
-     *  @param uname       optionally, Username
-     *  @param pwd         optionally, password
-     *  @return            NSAPI_ERROR_OK on success, or negative error code on failure
+     *  @param sim_pin     PIN for the SIM card.
+     *  @param apn         optionally, access point name.
+     *  @param uname       optionally, Username.
+     *  @param pwd         optionally, password.
+     *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
      */
     virtual nsapi_error_t connect(const char *sim_pin, const char *apn = 0,
                                   const char *uname = 0, const char *pwd = 0);
 
-    /** Attempt to connect to the Cellular network
+    /** Attempt to connect to the Cellular network.
      *
      *  Brings up the network interface. Connects to the Cellular Radio
      *  network and then brings up the underlying network stack to be used
      *  by the cellular modem over PPP interface.  Note: if init() has
      *  not been called beforehand, connect() will call it first.
      *
-     *  If the SIM requires a PIN, and it is not set/invalid, NSAPI_ERROR_AUTH_ERROR is returned.
      *  For APN setup, default behaviour is to use 'internet' as APN string and assuming no authentication
      *  is required, i.e., username and password are not set. Optionally, a database lookup can be requested
      *  by turning on the APN database lookup feature. The APN database is by no means exhaustive. It contains
@@ -211,42 +206,55 @@ public:
      *  If you find that the AT interface returns "CONNECT" but shortly afterwards drops the connection
      *  then 99% of the time this will be because the APN is incorrect.
      *
-     *  @return         0 on success, negative error code on failure
+     *  @return         0 on success, negative error code on failure.
      */
     virtual nsapi_error_t connect();
 
-    /** Attempt to disconnect from the network
+    /** Attempt to disconnect from the network.
      *
      *  Brings down the network interface. Shuts down the PPP interface
-     *  of the underlying network stack. Does not bring down the Radio network
+     *  of the underlying network stack. Does not bring down the Radio network.
      *
-     *  @return         0 on success, negative error code on failure
+     *  @return         0 on success, negative error code on failure.
      */
     virtual nsapi_error_t disconnect();
 
-    /** Adds or removes a SIM facility lock
+    /** Adds or removes a SIM facility lock.
      *
-     * Can be used to enable or disable SIM pin check at device startup.
-     * This API sets up flags for the driver which would either enable or disable
-     * SIM pin checking depending upon the user provided argument while establishing
-     * connection. It doesn't do anything immediately other than setting up flags.
+     * Can be used to enable or disable SIM PIN check at device startup.
      *
-     * @param unlock     can be set to true if the SIM pin check is supposed to be disabled
-     *                   and vice versa.
+     * @param pin_check_disabled  can be set to true if the SIM PIN check is supposed
+     *                            to be disabled and vice versa.
+     * @param immediate           if true, change the SIM PIN now, else set a flag
+     *                            and make the change only when connect() is called.
+     *                            If this is true and init() has not been called previously,
+     *                            it will be called first.
+     * @param sim_pin             the current SIM PIN, must be a const.  If this is not
+     *                            provided, the SIM PIN must have previously been set by a
+     *                            call to set_SIM_pin().
+     * @return                    0 on success, negative error code on failure.
      */
-    void add_remove_sim_pin_check(bool unlock);
+    nsapi_error_t add_remove_sim_pin_check(bool pin_check_disabled, bool immediate = false,
+                                           const char *sim_pin = NULL);
 
-    /** Change the pin for the SIM card
+    /** Change the PIN for the SIM card.
      *
-     * Provide the new pin for your SIM card with this API. Old pin code will be assumed to
-     * be set using set_SIM_pin() API. This API have no immediate effect. While establishing
-     * connection, driver will change the SIM pin for the next boot.
+     * Provide the new PIN for your SIM card with this API.  It is ONLY possible to
+     * change the SIM PIN when SIM PIN checking is ENABLED.
      *
-     * @param new_pin     new pin to be used in string format
+     * @param new_pin     new PIN to be used in string format, must be a const.
+     * @param immediate   if true, change the SIM PIN now, else set a flag
+     *                    and make the change only when connect() is called.
+     *                    If this is true and init() has not been called previously,
+     *                    it will be called first.
+     * @param old_pin     old PIN, must be a const.  If this is not provided, the SIM PIN
+     *                    must have previously been set by a call to set_SIM_pin().
+     * @return            0 on success, negative error code on failure.
      */
-    void change_sim_pin(const char *new_pin);
+    nsapi_error_t change_sim_pin(const char *new_pin, bool immediate = false,
+                                 const char *old_pin = NULL);
 
-    /** Check if the connection is currently established or not
+    /** Check if the connection is currently established or not.
      *
      * @return true/false   If the cellular module have successfully acquired a carrier and is
      *                      connected to an external packet data network using PPP, isConnected()
@@ -257,47 +265,49 @@ public:
     /** Get the local IP address
      *
      *  @return         Null-terminated representation of the local IP address
-     *                  or null if no IP address has been received
+     *                  or null if no IP address has been received.
      */
     virtual const char *get_ip_address();
 
-    /** Get the local network mask
+    /** Get the local network mask.
      *
      *  @return         Null-terminated representation of the local network mask
-     *                  or null if no network mask has been received
+     *                  or null if no network mask has been received.
      */
     virtual const char *get_netmask();
 
-    /** Get the local gateways
+    /** Get the local gateways.
      *
      *  @return         Null-terminated representation of the local gateway
-     *                  or null if no network mask has been received
+     *                  or null if no network mask has been received.
      */
     virtual const char *get_gateway();
 
-    /** Call back in case connection is lost
+    /** Call back in case connection is lost.
      *
-     * @param fptr     the function to call
+     * @param fptr     the function to call.
      */
     void connection_lost_notification_cb(void (*fptr)(nsapi_error_t));
 
 private:
     FileHandle *_fh;
     bool _useUSB;
-    const char *_new_pin;
     const char *_pin;
     const char *_apn;
     const char *_uname;
     const char *_pwd;
     bool _debug_trace_on;
     bool _modem_initialised;
-    bool _set_sim_pin_check_request;
-    bool _change_pin;
+    bool _sim_pin_check_enabled;
+    bool _sim_pin_check_change_pending;
+    bool _sim_pin_check_change_pending_disabled_value;
+    bool _sim_pin_change_pending;
+    const char *_sim_pin_change_pending_new_pin_value;
     void setup_at_parser();
     void shutdown_at_parser();
-    bool device_identity(device_type *dev);
+    bool set_device_identity(device_type *dev);
     bool device_init(device_type dev);
-    nsapi_error_t initialize_sim_card();
+    nsapi_error_t initialise_sim_card();
     nsapi_error_t setup_context_and_credentials();
     bool nwk_registration(device_type dev);
     bool nwk_registration_status(device_type dev);
@@ -317,9 +327,9 @@ private:
     bool set_CMGF();
     bool set_CNMI();
     bool set_ATD();
-    nsapi_error_t do_add_remove_sim_pin_check(const char *pin);
-    nsapi_error_t do_change_sim_pin(const char *old_pin, const char *new_pin);
     void parser_abort();
+    nsapi_error_t do_add_remove_sim_pin_check(bool pin_check_disabled);
+    nsapi_error_t do_change_sim_pin(const char *new_pin);
     void CMTI_URC();
     void CMT_URC();
 

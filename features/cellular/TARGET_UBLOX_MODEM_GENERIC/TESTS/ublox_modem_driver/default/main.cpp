@@ -15,12 +15,14 @@ using namespace utest::v1;
 // COMPILE-TIME MACROS
 // ----------------------------------------------------------------
 
-// The credentials of the test SIM
+// The credentials of the SIM in the board, which must have PIN disabled at
+// the outset.
 #ifndef TEST_DEFAULT_PIN
 // Note: for the JT M2M SIMs, each SIM is set up with a randomly
 // generated default PIN.  This is the PIN for the SIM with CCID
 // 8944501104169549834.
-# define TEST_DEFAULT_PIN "0779"
+//# define TEST_DEFAULT_PIN "0779"
+# define TEST_DEFAULT_PIN "9876"
 #endif
 #ifndef TEST_APN
 # define TEST_APN         "jtm2m"
@@ -34,7 +36,8 @@ using namespace utest::v1;
 
 // Alternate PIN to use during pin change testing
 #ifndef TEST_ALT_PIN
-# define TEST_ALT_PIN    "9876"
+//# define TEST_ALT_PIN    "9876"
+# define TEST_ALT_PIN    "0779"
 #endif
 
 // A PIN that is definitely incorrect
@@ -87,6 +90,7 @@ static void do_ntp(UbloxCellularInterface *pInterface)
     time_t TIME1970 = 2208988800U;
     UDPSocket sock;
     SocketAddress nist;
+    bool comms_done = false;
 
     ntp_values[0] = '\x1b';
 
@@ -98,12 +102,17 @@ static void do_ntp(UbloxCellularInterface *pInterface)
     tr_debug("UDP: NIST server %s address: %s on port %d.", host,
              nist.get_ip_address(), nist.get_port());
 
-    sock.set_timeout(5000);
+    sock.set_timeout(10000);
 
-    TEST_ASSERT(sock.sendto(nist, (void*) ntp_values, sizeof(ntp_values)) > 0);
-
-    TEST_ASSERT (sock.recvfrom(&nist, (void*) ntp_values, sizeof(ntp_values)) > 0);
+    // Retry this a few times, don't want to fail due to a flaky link
+    for (unsigned int x = 0; !comms_done && (x < 3); x++) {
+        sock.sendto(nist, (void*) ntp_values, sizeof(ntp_values));
+        if (sock.recvfrom(&nist, (void*) ntp_values, sizeof(ntp_values)) > 0) {
+            comms_done = true;
+        }
+    }
     sock.close();
+    TEST_ASSERT (comms_done);
 
     tr_debug("UDP: Values returned by NTP server:");
     for (size_t i = 0; i < sizeof(ntp_values) / sizeof(ntp_values[0]); ++i) {
@@ -174,20 +183,108 @@ void test_connect_preset_credentials() {
     drop_connection(pInterface);
 }
 
-// Test adding and using a SIM pin, then removing it
-// NOTE: this uses a local instance of the cellular interface, just for variety
-void test_add_sim_pin() {
+// Test adding and using a SIM pin, then removing it, using the pending
+// mechanism where the change doesn't occur until connect() is called
+void test_add_remove_sim_pin_pending() {
+
+    pInterface->deinit();
+
+    // Enable PIN checking (which will use the current PIN)
+    // and also flag that the PIN should be changed to TEST_ALT_PIN,
+    // then try connecting
+    pInterface->add_remove_sim_pin_check(false);
+    pInterface->change_sim_pin(TEST_ALT_PIN);
+    TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+    pInterface->deinit();
+
+    // Now change the PIN back to what it was before
+    pInterface->change_sim_pin(TEST_DEFAULT_PIN);
+    TEST_ASSERT(pInterface->connect(TEST_ALT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+    pInterface->deinit();
+
+    // Check that it was changed back, and this time
+    // use the other way of entering the PIN
+    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+    pInterface->deinit();
+
+    // Remove PIN checking again and check that it no
+    // longer matters what the PIN is
+    pInterface->add_remove_sim_pin_check(true);
+    TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+    pInterface->deinit();
+    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->connect(TEST_INCORRECT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+
+    // Put the SIM pin back to the correct value for any subsequent tests
+    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+}
+
+// Test adding and using a SIM pin, then removing it, using the immediate
+// mechanism
+void test_add_remove_sim_pin_immediate() {
+
+    pInterface->deinit();
+    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+
+    // Enable PIN checking (which will use the current PIN), change
+    // the PIN to TEST_ALT_PIN, then try connecting after powering on and
+    // off the modem
+    pInterface->add_remove_sim_pin_check(false, true, TEST_DEFAULT_PIN);
+    pInterface->change_sim_pin(TEST_ALT_PIN, true);
+    pInterface->deinit();
+    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->connect(TEST_ALT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+
+    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+
+    // Now change the PIN back to what it was before
+    pInterface->change_sim_pin(TEST_DEFAULT_PIN, true);
+    pInterface->deinit();
+    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+
+    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+
+    // Remove PIN checking again and check that it no
+    // longer matters what the PIN is
+    pInterface->add_remove_sim_pin_check(true, true);
+    pInterface->deinit();
+    pInterface->init(TEST_INCORRECT_PIN);
+    TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    use_connection(pInterface);
+    drop_connection(pInterface);
+
+    // Put the SIM pin back to the correct value for any subsequent tests
+    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+}
+
+// Test being able to connect with a local instance of the driver
+// NOTE: since this local instance will fiddle with bits of HW that the
+// static instance thought it owned, the static instance will no longer
+// work afterwards, hence this must be run as the last test in the list
+void test_connect_local_instance_last_test() {
 
     UbloxCellularInterface *pLocalInterface = NULL;
 
     pLocalInterface = new UbloxCellularInterface(true);
     pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
 
-    // Enable PIN checking (which will use the current PIN)
-    // and also flag that the PIN should be changed to TEST_ALT_PIN,
-    // then try connecting
-    pLocalInterface->add_remove_sim_pin_check(false);
-    pLocalInterface->change_sim_pin(TEST_ALT_PIN);
     TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pLocalInterface);
     drop_connection(pLocalInterface);
@@ -196,32 +293,7 @@ void test_add_sim_pin() {
     pLocalInterface = new UbloxCellularInterface(true);
     pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
 
-    // Now try connecting with TEST_ALT_PIN, flagging that we want to
-    // change the PIN back to what it was before
-    pInterface->change_sim_pin(TEST_DEFAULT_PIN);
-    TEST_ASSERT(pInterface->connect(TEST_ALT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
-    use_connection(pLocalInterface);
-    drop_connection(pLocalInterface);
-    delete pLocalInterface;
-
-    pLocalInterface = new UbloxCellularInterface(true);
-    pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
-
-    // Check that it was changed back, and this time
-    // use the other way of entering the PIN
-    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
-    TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
-    use_connection(pLocalInterface);
-    drop_connection(pLocalInterface);
-    delete pLocalInterface;
-
-    pLocalInterface = new UbloxCellularInterface(true);
-    pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
-
-    // Remove PIN checking again and check that it no
-    // longer matters what the PIN is
-    pInterface->add_remove_sim_pin_check(true);
-    TEST_ASSERT(pInterface->connect(TEST_INCORRECT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
+    TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pLocalInterface);
     drop_connection(pLocalInterface);
     delete pLocalInterface;
@@ -234,7 +306,7 @@ void test_add_sim_pin() {
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea with a timeout
-    GREENTEA_SETUP(360, "default_auto");
+    GREENTEA_SETUP(540, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
@@ -242,7 +314,10 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 Case cases[] = {
     Case("Connect with credentials", test_connect_credentials),
     Case("Connect with preset credentials", test_connect_preset_credentials),
-    //Case("Add and remove SIM pin", test_add_sim_pin),
+    Case("Add and remove SIM pin, pending", test_add_remove_sim_pin_pending),
+    Case("Add and remove SIM pin, immediate", test_add_remove_sim_pin_immediate),
+    Case("Connect using local instance, must be last test", test_connect_local_instance_last_test)
+
 };
 
 Specification specification(test_setup, cases);

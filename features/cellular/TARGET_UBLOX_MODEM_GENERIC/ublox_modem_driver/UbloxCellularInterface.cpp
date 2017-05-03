@@ -91,7 +91,7 @@ void UbloxCellularInterface::shutdown_at_parser()
 }
 
 // Get the device ID.
-bool UbloxCellularInterface::device_identity(device_type *dev)
+bool UbloxCellularInterface::set_device_identity(device_type *dev)
 {
     char buf[20];
     bool success;
@@ -141,14 +141,14 @@ bool UbloxCellularInterface::device_init(device_type dev)
 }
 
 // Get the SIM card going.
-nsapi_error_t UbloxCellularInterface::initialize_sim_card()
+nsapi_error_t UbloxCellularInterface::initialise_sim_card()
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
     int retry_count = 0;
     bool done = false;
     LOCK();
 
-    /* SIM initialization may take a significant amount, so an error is
+    /* SIM initialisation may take a significant amount, so an error is
      * kind of expected. We should retry 10 times until we succeed or timeout. */
     for (retry_count = 0; !done && (retry_count < 10); retry_count++) {
         char pinstr[16];
@@ -156,11 +156,13 @@ nsapi_error_t UbloxCellularInterface::initialize_sim_card()
         if (_at->send("AT+CPIN?") && _at->recv("+CPIN: %15[^\n]\nOK\n", pinstr)) {
             done = true;
             if (strcmp(pinstr, "SIM PIN") == 0) {
-                if (!_at->send("AT+CPIN=\"%s\"", _pin) || !_at->recv("OK")) {
+                _sim_pin_check_enabled = true;
+                if (_at->send("AT+CPIN=\"%s\"", _pin) && _at->recv("OK")) {
                     tr_debug("PIN correct");
                     nsapi_error = NSAPI_ERROR_OK;
                 }
             } else if (strcmp(pinstr, "READY") == 0) {
+                _sim_pin_check_enabled = false;
                 tr_debug("No PIN required");
                 nsapi_error = NSAPI_ERROR_OK;
             } else {
@@ -288,7 +290,7 @@ bool UbloxCellularInterface::power_up_modem()
     wait_ms(500);
 
     // The power-on call takes the module out of reset, here we toggle the power-on
-    // pin to do the actual waking up, see Sara-U2_DataSheet_(UBX-13005287).pdf section
+    // PIN to do the actual waking up, see Sara-U2_DataSheet_(UBX-13005287).pdf section
     // 4.2.6.
     for (int retry_count = 0; !success && (retry_count < 20); retry_count++) {
         pwrOn = 0;
@@ -334,9 +336,14 @@ bool UbloxCellularInterface::power_up_modem()
 void UbloxCellularInterface::power_down_modem()
 {
     LOCK();
+
+    // If possible, do a soft power-off first
     if (_at) {
         _at->send("AT+CPWROFF") && _at->recv("OK");
     }
+
+    // Now do a hard power-off
+    ublox_mdm_power_off();
 
     UNLOCK();
 }
@@ -582,40 +589,46 @@ bool UbloxCellularInterface::set_ATD()
 }
 
 // Enable or disable SIM pin check lock.
-nsapi_error_t UbloxCellularInterface::do_add_remove_sim_pin_check(const char *pin)
+// NOTE: the AT interface must be locked before this is called
+nsapi_error_t UbloxCellularInterface::do_add_remove_sim_pin_check(bool pin_check_disabled)
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
-    bool success = false;
-    LOCK();
 
-    if (_set_sim_pin_check_request) {
-        /* use the SIM unlocked always */
-        success = _at->send("AT+CLCK=\"SC\",0,\"%s\"", pin) && _at->recv("OK");
-    } else {
-        /* use the SIM locked always */
-        success = _at->send("AT+CLCK=\"SC\",1,\"%s\"",pin) && _at->recv("OK");
+    if (_pin != NULL) {
+        if (_sim_pin_check_enabled && pin_check_disabled) {
+            // Disable the SIM lock
+            if (_at->send("AT+CLCK=\"SC\",0,\"%s\"", _pin) && _at->recv("OK")) {
+                _sim_pin_check_enabled = false;
+                nsapi_error = NSAPI_ERROR_OK;
+            }
+        } else if (!_sim_pin_check_enabled && !pin_check_disabled) {
+            // Enable the SIM lock
+            if (_at->send("AT+CLCK=\"SC\",1,\"%s\"", _pin) && _at->recv("OK")) {
+                _sim_pin_check_enabled = true;
+                nsapi_error = NSAPI_ERROR_OK;
+            }
+        } else {
+            nsapi_error = NSAPI_ERROR_OK;
+        }
     }
 
-    if (success) {
-        nsapi_error = NSAPI_ERROR_OK;
-    }
-
-    UNLOCK();
     return nsapi_error;
 }
 
 // Change the pin code for the SIM card.
-nsapi_error_t UbloxCellularInterface::do_change_sim_pin(const char *old_pin, const char *new_pin)
+// NOTE: the AT interface must be locked before this is called
+nsapi_error_t UbloxCellularInterface::do_change_sim_pin(const char *new_pin)
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
-    LOCK();
 
-    /* change the SIM pin */
-    if (_at->send("AT+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin) && _at->recv("OK")) {
-        nsapi_error = NSAPI_ERROR_OK;
+    // Change the SIM pin
+    if ((new_pin != NULL) && (_pin != NULL)) {
+        if (_at->send("AT+CPWD=\"SC\",\"%s\",\"%s\"", _pin, new_pin) && _at->recv("OK")) {
+            _pin = new_pin;
+            nsapi_error = NSAPI_ERROR_OK;
+        }
     }
 
-    UNLOCK();
     return nsapi_error;
 }
 
@@ -671,7 +684,6 @@ NetworkStack *UbloxCellularInterface::get_stack()
 // Constructor.
 UbloxCellularInterface::UbloxCellularInterface(bool debugOn, PinName tx, PinName rx, int baud, bool use_USB)
 {
-    _new_pin = NULL;
     _pin = NULL;
     _at = NULL;
     _apn = "internet";
@@ -680,8 +692,11 @@ UbloxCellularInterface::UbloxCellularInterface(bool debugOn, PinName tx, PinName
     _useUSB = use_USB;
     _debug_trace_on = false;
     _modem_initialised = false;
-    _set_sim_pin_check_request = false;
-    _change_pin = false;
+    _sim_pin_check_enabled = false;
+    _sim_pin_check_change_pending = false;
+    _sim_pin_check_change_pending_disabled_value = false;
+    _sim_pin_change_pending = false;
+    _sim_pin_change_pending_new_pin_value = NULL;
 
     // USB is not currently supported
     MBED_ASSERT(!use_USB);
@@ -747,9 +762,9 @@ nsapi_error_t UbloxCellularInterface::init(const char *sim_pin)
             if (sim_pin != NULL) {
                 _pin = sim_pin;
             }
-            nsapi_error = initialize_sim_card();
+            nsapi_error = initialise_sim_card();
             if (nsapi_error == NSAPI_ERROR_OK) {
-                if (device_identity(&_dev_info->dev) && // Set up device identity
+                if (set_device_identity(&_dev_info->dev) && // Set up device identity
                     device_init(_dev_info->dev) && // Initialise this device
                     get_CCID()  && // Get integrated circuit ID of the SIM
                     get_IMSI()  && // Get international mobile subscriber information
@@ -786,26 +801,6 @@ nsapi_error_t UbloxCellularInterface::init(const char *sim_pin)
         }
     }
 
-    if (_modem_initialised) {
-        // Check if the user wants to perform SIM pin checking on boot up
-        if (_set_sim_pin_check_request) {
-            nsapi_error = do_add_remove_sim_pin_check(_pin);
-            if (nsapi_error == NSAPI_ERROR_OK) {
-                // Set this request to false, as it is unnecessary to repeat in case of retry
-                _set_sim_pin_check_request = false;
-            }
-        }
-
-        // Check if the user requested a SIM pin change
-        if (_change_pin) {
-            nsapi_error = do_change_sim_pin(_pin, _new_pin);
-            if (nsapi_error == NSAPI_ERROR_OK) {
-                // Set this request to false, as it is unnecessary to repeat in case of retry
-                _change_pin = false;
-            }
-        }
-    }
-
     UNLOCK();
     return nsapi_error;
 }
@@ -833,7 +828,7 @@ void  UbloxCellularInterface::set_credentials(const char *apn, const char *uname
 }
 
 void UbloxCellularInterface::set_SIM_pin(const char *pin) {
-    /* overwrite the default pin by user provided pin */
+    /* overwrite the default PIN by user provided PIN */
     _pin = pin;
 }
 
@@ -870,16 +865,26 @@ nsapi_error_t UbloxCellularInterface::connect()
 
     if (!_dev_info->ppp_connection_up) {
 
-        // Assume all is well
-        nsapi_error = NSAPI_ERROR_OK;
-
         // Set up modem and then register with the network
         nsapi_error = init();
         if (nsapi_error == NSAPI_ERROR_OK) {
-            nsapi_error = NSAPI_ERROR_NO_CONNECTION;
-            for (int retries = 0; (nsapi_error == NSAPI_ERROR_NO_CONNECTION) && (retries < 3); retries++) {
-                if (nwk_registration(_dev_info->dev)) {
-                    nsapi_error = NSAPI_ERROR_OK;
+
+            // Perform any pending SIM actions
+            if (_sim_pin_check_change_pending) {
+                nsapi_error = do_add_remove_sim_pin_check(_sim_pin_check_change_pending_disabled_value);
+                _sim_pin_check_change_pending = false;
+            }
+            if (_sim_pin_change_pending) {
+                nsapi_error = do_change_sim_pin(_sim_pin_change_pending_new_pin_value);
+                _sim_pin_change_pending = false;
+            }
+
+            if (nsapi_error == NSAPI_ERROR_OK) {
+                nsapi_error = NSAPI_ERROR_NO_CONNECTION;
+                for (int retries = 0; (nsapi_error == NSAPI_ERROR_NO_CONNECTION) && (retries < 3); retries++) {
+                    if (nwk_registration(_dev_info->dev)) {
+                        nsapi_error = NSAPI_ERROR_OK;
+                    }
                 }
             }
         }
@@ -887,10 +892,7 @@ nsapi_error_t UbloxCellularInterface::connect()
         if (nsapi_error == NSAPI_ERROR_OK) {
             // Attempt to enter data mode
             if (set_ATD()) {
-                // Save RAM, discard AT Parser as we have entered data mode
-                shutdown_at_parser();
-
-                // Here we would like to attach an interrupt line to the DCD pin
+                // Here we would like to attach an interrupt line to the DCD PIN
                 // We cast back the serial interface from the file handle and set
                 // the DCD line.
                 if(!_useUSB) {
@@ -910,10 +912,9 @@ nsapi_error_t UbloxCellularInterface::connect()
             }
         }
 
-        // If we were unable to connect, power down the modem and free memory
+        // If we were unable to connect, power down the modem
         if (!_dev_info->ppp_connection_up) {
             power_down_modem();
-            shutdown_at_parser();
         }
     }
 
@@ -923,20 +924,65 @@ nsapi_error_t UbloxCellularInterface::connect()
 // User initiated disconnect.
 nsapi_error_t UbloxCellularInterface::disconnect()
 {
-    return nsapi_ppp_disconnect(_fh);
+    nsapi_error_t nsapi_error = nsapi_ppp_disconnect(_fh);
+
+    // Get the "NO CARRIER" response out of the modem
+    // so as not to confuse subsequent AT commands
+    if (_at) {
+        _at->send("AT") && _at->recv("NO CARRIER");
+    }
+
+    return nsapi_error;
 }
 
-// Sets up the flag for the driver to enable or disable SIM pin check at the next boot.
-void UbloxCellularInterface::add_remove_sim_pin_check(bool unlock)
+// Enable or disable SIM PIN check lock.
+nsapi_error_t UbloxCellularInterface::add_remove_sim_pin_check(bool pin_check_disabled, bool immediate, const char *sim_pin)
 {
-    _set_sim_pin_check_request = unlock;
+    nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
+    LOCK();
+
+    if (sim_pin != NULL) {
+        _pin = sim_pin;
+    }
+
+    if (immediate) {
+        nsapi_error = init();
+        if (nsapi_error == NSAPI_ERROR_OK) {
+            nsapi_error = do_add_remove_sim_pin_check(pin_check_disabled);
+        }
+    } else {
+        nsapi_error = NSAPI_ERROR_OK;
+        _sim_pin_check_change_pending = true;
+        _sim_pin_check_change_pending_disabled_value = pin_check_disabled;
+    }
+
+    UNLOCK();
+    return nsapi_error;
 }
 
-// Sets up the flag for the driver to change pin code for SIM card.
-void UbloxCellularInterface::change_sim_pin(const char *new_pin)
+// Change the PIN code for the SIM card.
+nsapi_error_t UbloxCellularInterface::change_sim_pin(const char *new_pin, bool immediate, const char *old_pin)
 {
-    _change_pin = true;
-    _new_pin = new_pin;
+    nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
+    LOCK();
+
+    if (old_pin != NULL) {
+        _pin = old_pin;
+    }
+
+    if (immediate) {
+        nsapi_error = init();
+        if (nsapi_error == NSAPI_ERROR_OK) {
+            nsapi_error = do_change_sim_pin(new_pin);
+        }
+    } else {
+        nsapi_error = NSAPI_ERROR_OK;
+        _sim_pin_change_pending = true;
+        _sim_pin_change_pending_new_pin_value = new_pin;
+    }
+
+    UNLOCK();
+    return nsapi_error;
 }
 
 // Determine if PPP is up.

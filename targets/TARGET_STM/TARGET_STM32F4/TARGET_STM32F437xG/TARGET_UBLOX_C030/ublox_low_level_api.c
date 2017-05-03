@@ -26,7 +26,7 @@ void ublox_mdm_init(void) {
     
     // start with modem disabled 
     gpio_init_out_ex(&gpio, MDMRST,    0);
-    gpio_init_out_ex(&gpio, MDMPWRON,  1);
+    gpio_init_out_ex(&gpio, MDMPWRON,  0);
     gpio_init_out_ex(&gpio, MDMRTS,    0);
 
     // start with GNSS disabled

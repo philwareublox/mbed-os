@@ -38,6 +38,19 @@
  */
 
 #ifdef DEVICE_MODEM
+
+typedef enum {
+    POWER_READY=1,
+    POWERED_ON,
+    POWERED_OFF,
+    LOWEST_POWER_STATE
+} modem_state;
+
+/**
+ * modem_s is defined in objects.h inside the TARGET folder
+ */
+typedef struct modem_s modem_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,26 +59,26 @@ extern "C" {
  *  modem_init() will be equivalent to plugging in the device, i.e.,
  *  attaching power and serial port.
  */
-void modem_init(void);
+void modem_init(modem_t *obj);
 
 /** Sets the modem in unplugged state
  *  modem_deinit() will be equivalent to pulling the plug off of the device, i.e.,
  *  detaching power and serial port.
  *  This puts the modem in lowest power state.
  */
-void modem_deinit(void);
+void modem_deinit(modem_t *obj);
 
 /** Powers up the modem
  *  modem_power_up() will be equivalent to pressing the soft power button.
  *  The driver may repeat this if the modem is not responsive to AT commands.
 
  */
-void modem_power_up(void);
+void modem_power_up(modem_t *obj);
 
 /** Powers down the modem
  *  modem_power_down() will be equivalent to turning off the modem by button press.
  */
-void modem_power_down(void);
+void modem_power_down(modem_t *obj);
 
 #ifdef __cplusplus
 }

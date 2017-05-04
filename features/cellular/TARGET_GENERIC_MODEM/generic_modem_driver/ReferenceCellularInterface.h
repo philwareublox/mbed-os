@@ -43,20 +43,6 @@ typedef enum {
 } radio_access_nwk_type;
 
 /**
- * Network registration status (CGREG Usage)
- * UBX-13001820 - AT Commands Example Application Note (Section 18.27.3)
- */
-typedef enum {
-    NOT_REGISTERED_NOT_SEARCHING=0,
-    REGISTERED=1,
-    NOT_REGISTERED_SEARCHING=2,
-    REGISTRATION_DENIED=3,
-    UNKNOWN_COVERAGE=4,
-    REGISTERED_ROAMING=5,
-    EMERGENCY_SERVICES_ONLY=6
-} nwk_registration_status;
-
-/**
  * Circuit Switched network registration status (CREG Usage)
  * UBX-13001820 - AT Commands Example Application Note (Section 7.10.3)
  */

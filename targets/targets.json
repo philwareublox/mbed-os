@@ -1343,6 +1343,7 @@
         "macros": ["TRANSACTION_QUEUE_SIZE_SPI=2", "RTC_LSI=1", "HSE_VALUE=12000000"],
         "inherits": ["Target"],
         "device_has": ["ANALOGIN", "ANALOGOUT", "I2C", "I2CSLAVE", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "SERIAL", "SLEEP", "RTC", "SPI", "SPISLAVE", "STDIO_MESSAGES", "TRNG"],
+        "features": ["LWIP"],
         "public": false,
         "device_name": "STM32F437VG"
     },

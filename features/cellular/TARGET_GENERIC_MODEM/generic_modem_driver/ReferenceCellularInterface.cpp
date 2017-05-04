@@ -63,6 +63,7 @@ static bool set_credentials_api_used = false;
 static bool set_sim_pin_check_request = false;
 static bool change_pin = false;
 static device_info *dev_info;
+static modem_t mdm_object;
 
 static void parser_abort(ATParser *at)
 {
@@ -194,19 +195,6 @@ static nsapi_error_t do_change_sim_pin(ATParser *at, const char *old_pin, const 
        return NSAPI_ERROR_AUTH_FAILURE;
 }
 
-static bool is_registered_psd()
-{
-    return (dev_info->reg_status_psd == PSD_REGISTERED) ||
-            (dev_info->reg_status_psd == PSD_REGISTERED_ROAMING);
-}
-
-static bool is_registered_csd()
-{
-  return (dev_info->reg_status_csd == CSD_REGISTERED) ||
-          (dev_info->reg_status_csd == CSD_REGISTERED_ROAMING) ||
-          (dev_info->reg_status_csd == CSD_CSFB_NOT_PREFERRED);
-}
-
 static void set_nwk_reg_status_csd(unsigned int status)
 {
     switch (status) {
@@ -325,18 +313,23 @@ void ReferenceCellularInterface::change_sim_pin(const char *new_pin)
 
 bool ReferenceCellularInterface::nwk_registration()
 {
-    bool success = _at->send("AT+COPS=2;" // clean the slate first, i.e., try unregistering if connected before
-                               "+COPS=0")//initiate auto-registration
+    bool success = _at->send("AT+COPS=0") //initiate auto-registration
                    && _at->recv("OK");
     if (!success) {
         tr_error("Modem not responding.");
         return false;
     }
     // Enable the packet switched and network registration
-    nwk_registration_status_csd();
-    nwk_registration_status_psd();
+    if (!nwk_registration_status_csd()) {
+        tr_error("CSD connection failed.");
+        return false;
+    }
+    if (!nwk_registration_status_psd()) {
+        tr_error("PSD connection failed.");
+        return false;
+    }
 
-    return is_registered_csd() || is_registered_psd() ? true : false;
+    return true;
 }
 
 bool ReferenceCellularInterface::nwk_registration_status_csd()
@@ -457,7 +450,7 @@ nsapi_error_t ReferenceCellularInterface::initialize_sim_card()
                     nsapi_error = NSAPI_ERROR_OK;
                 }
             } else if (strcmp(pinstr, "READY") == 0) {
-                tr_debug("No PIN required");
+                tr_debug("SIM Ready");
                 nsapi_error = NSAPI_ERROR_OK;
                 done = true;
             } else {
@@ -756,8 +749,8 @@ const char *ReferenceCellularInterface::get_gateway()
  *  Uses AT command to do it */
 void ReferenceCellularInterface::PowerDownModem()
 {
-    modem_power_down();
-    modem_deinit();
+    modem_power_down(&mdm_object);
+    modem_deinit(&mdm_object);
 }
 
 /**
@@ -768,7 +761,7 @@ void ReferenceCellularInterface::PowerDownModem()
 bool ReferenceCellularInterface::PowerUpModem()
 {
     /* Initialize GPIO lines */
-    modem_init();
+    modem_init(&mdm_object);
     /* Give modem a little time to settle down */
     wait(0.25);
 
@@ -776,14 +769,14 @@ bool ReferenceCellularInterface::PowerUpModem()
 
     int retry_count = 0;
     while (true) {
-        modem_power_up();
+        modem_power_up(&mdm_object);
         /* Modem tends to spit out noise during power up - don't confuse the parser */
         _at->flush();
         /* It is mandatory to avoid sending data to the serial port during the first 200 ms
          * of the module startup. Telit_xE910 Global form factor App note.
          * Not necessary for all types of modems however. Let's wait just to be on the safe side */
         wait_ms(200);
-        _at->setTimeout(1000);
+        _at->set_timeout(1000);
         if (_at->send("AT") && _at->recv("OK")) {
             tr_info("Modem Ready.");
             break;
@@ -794,7 +787,7 @@ bool ReferenceCellularInterface::PowerUpModem()
         }
     }
 
-    _at->setTimeout(8000);
+    _at->set_timeout(8000);
 
     /*For more details regarding DCD and DTR circuitry, please refer to Modem AT manual */
     success = _at->send("AT"

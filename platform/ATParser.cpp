@@ -22,8 +22,8 @@
 #include "mbed_poll.h"
 #include "mbed_debug.h"
 
-#define LF 10
-#define CR 13
+#define _LF 10
+#define _CR 13
 
 // getc/putc handling with timeouts
 int ATParser::putc(char c)
@@ -38,18 +38,6 @@ int ATParser::putc(char c)
     } else {
         return -1;
     }
-    /*
-    Timer timer;
-    timer.start();
-
-    while (true) {
-        if (_fh->writable()) {
-            return _fh->fputc(c);
-        }
-        if (timer.read_ms() > _timeout) {
-            return -1;
-        }
-    }*/
 }
 
 int ATParser::getc()
@@ -65,19 +53,6 @@ int ATParser::getc()
     } else {
         return -1;
     }
-
-    /*
-    Timer timer;
-    timer.start();
-
-    while (true) {
-        if (_fh->readable()) {
-            return _fh->fgetc();
-        }
-        if (timer.read_ms() > _timeout) {
-            return -1;
-        }
-    }*/
 }
 
 void ATParser::flush()
@@ -215,7 +190,7 @@ bool ATParser::vsend(const char *command, va_list args)
         }
     }
 
-    debug_if(dbg_on, "AT> %s\n", _buffer);
+    debug_if(_dbg_on, "AT> %s\n", _buffer);
     return true;
 }
 
@@ -255,7 +230,7 @@ restart:
         _buffer[offset++] = 'n';
         _buffer[offset++] = 0;
 
-        debug_if(dbg_on, "AT? %s\n", _buffer);
+        debug_if(_dbg_on, "AT? %s\n", _buffer);
         // To workaround scanf's lack of error reporting, we actually
         // make two passes. One checks the validity with the modified
         // format string that only stores the matched characters (%n).
@@ -269,16 +244,16 @@ restart:
             // Receive next character
             int c = getc();
             if (c < 0) {
-                debug_if(dbg_on, "AT(Timeout)\n");
+                debug_if(_dbg_on, "AT(Timeout)\n");
                 return false;
             }
             // Simplify newlines (borrowed from retarget.cpp)
-            if ((c == CR && _in_prev != LF) ||
-                (c == LF && _in_prev != CR)) {
+            if ((c == _CR && _in_prev != _LF) ||
+                (c == _LF && _in_prev != _CR)) {
                 _in_prev = c;
                 c = '\n';
-            } else if ((c == CR && _in_prev == LF) ||
-                       (c == LF && _in_prev == CR)) {
+            } else if ((c == _CR && _in_prev == _LF) ||
+                       (c == _LF && _in_prev == _CR)) {
                 _in_prev = c;
                 // onto next character
                 continue;
@@ -292,11 +267,11 @@ restart:
             for (struct oob *oob = _oobs; oob; oob = oob->next) {
                 if ((unsigned)j == oob->len && memcmp(
                         oob->prefix, _buffer+offset, oob->len) == 0) {
-                    debug_if(dbg_on, "AT! %s\n", oob->prefix);
+                    debug_if(_dbg_on, "AT! %s\n", oob->prefix);
                     oob->cb();
 
                     if (_aborted) {
-                        debug_if(dbg_on, "AT(Aborted)\n");
+                        debug_if(_dbg_on, "AT(Aborted)\n");
                         return false;
                     }
                     // oob may have corrupted non-reentrant buffer,
@@ -317,7 +292,7 @@ restart:
 
             // We only succeed if all characters in the response are matched
             if (count == j) {
-                debug_if(dbg_on, "AT= %s\n", _buffer+offset);
+                debug_if(_dbg_on, "AT= %s\n", _buffer+offset);
                 // Reuse the front end of the buffer
                 memcpy(_buffer, response, i);
                 _buffer[i] = 0;
@@ -333,8 +308,7 @@ restart:
             // Clear the buffer when we hit a newline or ran out of space
             // running out of space usually means we ran into binary data
             if (c == '\n' || j+1 >= _buffer_size - offset) {
-                //debug_if(dbg_on, "count=%d, j=%d, c=%d, wl=%d, format='%s', buffer='%s'\n", count, j, c, whole_line_wanted, _buffer, _buffer+offset);
-                debug_if(dbg_on, "AT< %s", _buffer+offset);
+                debug_if(_dbg_on, "AT< %s", _buffer+offset);
                 j = 0;
             }
         }
@@ -342,7 +316,6 @@ restart:
 
     return true;
 }
-
 
 // Mapping to vararg functions
 int ATParser::printf(const char *format, ...)
@@ -380,7 +353,6 @@ bool ATParser::recv(const char *response, ...)
     va_end(args);
     return res;
 }
-
 
 // oob registration
 void ATParser::oob(const char *prefix, Callback<void()> cb)

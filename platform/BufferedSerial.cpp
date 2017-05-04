@@ -32,7 +32,7 @@ BufferedSerial::BufferedSerial(PinName tx, PinName rx, int baud) :
         _dcd(NULL)
 {
     /* Attatch IRQ routines to the serial device. */
-    SerialBase::attach(callback(this, &BufferedSerial::RxIRQ), RxIrq);
+    SerialBase::attach(callback(this, &BufferedSerial::rx_irq), RxIrq);
 }
 
 BufferedSerial::~BufferedSerial()
@@ -128,9 +128,9 @@ ssize_t BufferedSerial::write(const void* buffer, size_t length)
 
     core_util_critical_section_enter();
     if (!_tx_irq_enabled) {
-        BufferedSerial::TxIRQ();                // only write to hardware in one place
+        BufferedSerial::tx_irq();                // only write to hardware in one place
         if (!_txbuf.empty()) {
-            SerialBase::attach(callback(this, &BufferedSerial::TxIRQ), TxIrq);
+            SerialBase::attach(callback(this, &BufferedSerial::tx_irq), TxIrq);
             _tx_irq_enabled = true;
         }
     }
@@ -171,7 +171,7 @@ ssize_t BufferedSerial::read(void* buffer, size_t length)
     return data_read;
 }
 
-bool BufferedSerial::HUP() const
+bool BufferedSerial::hup() const
 {
     return _dcd && _dcd->read() != 0;
 }
@@ -187,7 +187,7 @@ short BufferedSerial::poll(short events) const {
     }
 
     /* POLLHUP and POLLOUT are mutually exclusive */
-    if (HUP()) {
+    if (hup()) {
         revents |= POLLHUP;
     } else if (!_txbuf.full()) {
         revents |= POLLOUT;
@@ -208,7 +208,7 @@ void BufferedSerial::unlock(void)
     _mutex.unlock();
 }
 
-void BufferedSerial::RxIRQ(void)
+void BufferedSerial::rx_irq(void)
 {
     bool was_empty = _rxbuf.empty();
 
@@ -230,7 +230,7 @@ void BufferedSerial::RxIRQ(void)
 }
 
 // Also called from write to start transfer
-void BufferedSerial::TxIRQ(void)
+void BufferedSerial::tx_irq(void)
 {
     bool was_full = _txbuf.full();
 
@@ -248,11 +248,10 @@ void BufferedSerial::TxIRQ(void)
     }
 
     /* Report the File handler that data can be written to peripheral. */
-    if (was_full && !_txbuf.full() && !HUP()) {
+    if (was_full && !_txbuf.full() && !hup()) {
         _poll_change(this);
     }
 }
-
 
 } //namespace mbed
 

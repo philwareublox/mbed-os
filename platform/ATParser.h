@@ -56,7 +56,7 @@ private:
     const char *_output_delimiter;
     int _output_delim_size;
     char _in_prev;
-    bool dbg_on;
+    bool _dbg_on;
     bool _aborted;
 
     struct oob {
@@ -76,9 +76,10 @@ public:
     /**
     * Constructor
     *
-    * @param serial serial interface to use for AT commands
-    * @param buffer_size size of internal buffer for transaction
-    * @param timeout timeout of the connection
+    * @param serial         serial interface to use for AT commands
+    * @param buffer_size    size of internal buffer for transaction
+    * @param timeout        timeout of the connection
+    * @param debug          turns on/off debug output for AT commands
     */
     ATParser(FileHandle *fh, const char *output_delimiter="\r", int buffer_size = 256, int timeout = 8000, bool debug = false) :
         _fh(fh),
@@ -86,9 +87,9 @@ public:
         _in_prev(0),
         _oobs(NULL) {
         _buffer = new char[buffer_size];
-        setTimeout(timeout);
-        setDelimiter(output_delimiter);
-        debugOn(debug);
+        set_timeout(timeout);
+        set_delimiter(output_delimiter);
+        debug_on(debug);
     }
 
     /**
@@ -108,8 +109,20 @@ public:
     *
     * @param timeout timeout of the connection
     */
-    void setTimeout(int timeout) {
+    void set_timeout(int timeout) {
         _timeout = timeout;
+    }
+
+    /**
+    * For backwards compatibility.
+    *
+    * Please use set_timeout(int) API only from now on.
+    * Allows timeout to be changed between commands
+    *
+    * @param timeout timeout of the connection
+    */
+    void setTimeout(int timeout) {
+        set_timeout(timeout);
     }
 
     /**
@@ -117,10 +130,23 @@ public:
      *
      * @param delimiter string of characters to use as line delimiters
      */
-    void setDelimiter(const char *output_delimiter)
+    void set_delimiter(const char *output_delimiter)
     {
         _output_delimiter = output_delimiter;
         _output_delim_size = strlen(output_delimiter);
+    }
+
+    /**
+     * For backwards compatibility.
+     *
+     * Please use set_delimiter(const char *) API only from now on.
+     * Sets string of characters to use as line delimiters
+     *
+     * @param delimiter string of characters to use as line delimiters
+     */
+    void setDelimiter(const char *output_delimiter)
+    {
+        set_delimiter(output_delimiter);
     }
 
     /**
@@ -128,8 +154,19 @@ public:
     *
     * @param echo 1 for echo and 0 turns it off
     */
+    void debug_on(uint8_t on) {
+        _dbg_on = (on) ? 1 : 0;
+    }
+
+    /**
+     * For backwards compatibility.
+     *
+     * Allows echo to be on or off
+     *
+     * @param echo 1 for echo and 0 turns it off
+     */
     void debugOn(uint8_t on) {
-        dbg_on = (on) ? 1 : 0;
+        debug_on(on);
     }
 
     /**
@@ -242,19 +279,6 @@ public:
     * @note out-of-band data is only processed during a scanf call
     */
     void oob(const char *prefix, mbed::Callback<void()> func);
-
-    /**
-    * Attach a callback for out-of-band data
-    *
-    * @param prefix string on when to initiate callback
-    * @param obj pointer to object to call member function on
-    * @param method callback to call when string is read
-    * @note out-of-band data is only processed during a scanf call
-    */
-    template <typename T, typename M>
-    void oob(const char *prefix, T *obj, M method) {
-        return oob(prefix, mbed::Callback<void()>(obj, method));
-    }
 
     /**
     * Flushes the underlying stream

@@ -29,28 +29,36 @@ static void press_power_button(int time_ms)
     gpio_write(&gpio, 1);
 }
 
-void modem_init()
+void modem_init(modem_t *obj)
 {
    //does nothing at the moment, TODO: MultiTech to add hardware initialization stuff if needed
+    obj->state = POWER_READY;
 }
 
-void modem_deinit()
+void modem_deinit(modem_t *obj)
 {
     //does nothing at the moment, TODO: MultiTech to add hardware de-initialization stuff if needed
+    obj->state = LOWEST_POWER_STATE;
 }
-void modem_power_up()
+void modem_power_up(modem_t *obj)
 {
-    /* keep the power line low for 150 milisecond */
-    press_power_button(300);
+    /* keep the power line low for 200 milisecond */
+    press_power_button(200);
     /* give modem a little time to respond */
     wait_ms(100);
+    obj->state = POWERED_ON;
 }
 
-void modem_power_down()
+void modem_power_down(modem_t *obj)
 {
     gpio_t gpio;
 
     gpio_init_out_ex(&gpio, MDMPWRON, 0);
-    wait_ms(400);
+    /* keep the power line low for more than 10 seconds.
+     * If 3G_ON_OFF pin is kept low for more than a second, a controlled disconnect and shutdown takes
+     * place, Due to the network disconnect, shut-off can take up to 30 seconds. However, we wait for 10
+     * seconds only   */
+    wait_ms(10*1000);
+    obj->state = POWERED_OFF;
 }
 #endif //DEVICE_MODEM

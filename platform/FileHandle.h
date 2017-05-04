@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2017 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -184,14 +184,20 @@ public:
      *  For example, if the FileHandle is of type Stream, writable() could return
      *  true when there is ample buffer space available for write() calls.
      */
-    bool writable() const { return poll(POLLOUT) & POLLOUT; }
+    bool writable() const
+    {
+        return poll(POLLOUT) & POLLOUT;
+    }
 
     /** Returns true if the FileHandle is readable.
      *  Definition depends upon the subclass implementing FileHandle.
      *  For example, if the FileHandle is of type Stream, readable() could return
      *  true when there is something available to read.
      */
-    bool readable() const { return poll(POLLIN) & POLLIN; }
+    bool readable() const
+    {
+        return poll(POLLIN) & POLLIN;
+    }
 
     /** Register a callback on state change of the file.
      *
@@ -213,7 +219,12 @@ public:
     void sigio(Callback<void()> func);
 
     /** Issue sigio to user - used by mbed::_poll_change */
-    void _send_sigio() { if (_callback) { _callback(); } }
+    void _send_sigio()
+    {
+        if (_callback) {
+            _callback();
+        }
+    }
 
 private:
     Callback<void()> _callback;
@@ -227,22 +238,6 @@ private:
  *  @param mode, operation upon the file descriptor, e.g., 'wb+'*/
 
 std::FILE *fdopen(FileHandle *fh, const char *mode);
-
-/** XXX Think - how to do fileno() equivalent to map FILE * to FileHandle *? */
-/** Need toolchain-dependent code to get FILEHANDLE from FILE *, and then that needs to be
- * looked up in retarget.cpp's filehandles array.
- * Probably not needed for now.
- *
- * FileHandle *fileno(FILE *stream)
- * {
- *     int num = stream->_file;
- *     if (num < 3) {
- *          return NULL;
- *     }
- *     return filehandles[num-3];
- * }
- */
-
 
 } // namespace mbed
 

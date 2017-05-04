@@ -71,7 +71,6 @@ private:
     /** Software serial buffers
      *  By default buffer size is 256 for TX and 256 for RX. Configurable through mbed_app.json
      */
-
     CircularBuffer<char, MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE> _rxbuf;
     CircularBuffer<char, MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE> _txbuf;
 
@@ -81,15 +80,20 @@ private:
     bool _tx_irq_enabled;
     InterruptIn *_dcd;
 
-    bool HUP() const;
+    /** Device Hanged up
+     *  Determines if the device hanged up on us.
+     *
+     *  @return True, if hanged up
+     */
+    bool hup() const;
 
     /** ISRs for serial
      *  Routines to handle interrupts on serial pins.
      *  Copies data into Circular Buffer.
      *  Reports the state change to File handle.
      */
-    void TxIRQ(void);
-    void RxIRQ(void);
+    void tx_irq(void);
+    void rx_irq(void);
 
     void DCD_IRQ(void);
 };

@@ -30,28 +30,32 @@ static void press_power_button(int time_ms)
     gpio_write(&gpio, 1);
 }
 
-void modem_init()
+void modem_init(modem_t *obj)
 {
     //currently USB is not supported, so pass 0 to disable USB
     //This call does everything except actually pressing the power button
     ublox_mdm_powerOn(0);
+    obj->state = POWER_READY;
 }
 
-void modem_deinit()
+void modem_deinit(modem_t *obj)
 {
     ublox_mdm_powerOff();
+    obj->state = LOWEST_POWER_STATE;
 }
-void modem_power_up()
+void modem_power_up(modem_t *obj)
 {
     /* keep the power line low for 150 milisecond */
     press_power_button(150);
     /* give modem a little time to respond */
     wait_ms(100);
+    obj->state = POWERED_ON;
 }
 
-void modem_power_down()
+void modem_power_down(modem_t *obj)
 {
     /* keep the power line low for 1 second */
     press_power_button(1000);
+    obj->state = POWERED_OFF;
 }
 #endif //DEVICE_MODEM

@@ -23,15 +23,17 @@
 #include <cstdarg>
 
 namespace mbed {
-/** \addtogroup drivers */
+/** \addtogroup platform */
 /** @{*/
 
 extern int mbed_getc(std::FILE *_file);
 extern char* mbed_gets(char *s, int size, std::FILE *_file);
+/** @}*/
 
 /** File stream
  *
  * @Note Synchronization level: Set by subclass
+ * @ingroup platform
  */
 class Stream : public FileLike {
 
@@ -88,4 +90,3 @@ private:
 
 #endif
 
-/** @}*/

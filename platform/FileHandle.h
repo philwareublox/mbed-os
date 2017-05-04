@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2017 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,11 @@ typedef int FILEHANDLE;
 
 #include <cstdio>
 #include "Callback.h"
+#include "platform/mbed_poll.h"
 #include "platform/platform.h"
 
-#define MBED_POLLIN         0x0001
-#define MBED_POLLOUT        0x0010
-
-#define MBED_POLLERR        0x1000
-#define MBED_POLLHUP        0x2000
-#define MBED_POLLNVAL       0x4000
-
 namespace mbed {
-/** \addtogroup drivers */
-/** @{*/
+/** \addtogroup platform */
 
 
 /** Class FileHandle
@@ -42,6 +35,7 @@ namespace mbed {
  *
  *  @note to create a file, @see File
  *  @note Synchronization level: Set by subclass
+ *  @ingroup platform
  */
 class FileHandle {
 public:
@@ -183,23 +177,29 @@ public:
      */
     virtual short poll(short events) const {
         // Possible default for real files
-        return MBED_POLLIN | MBED_POLLOUT;
+        return POLLIN | POLLOUT;
     }
     /** Returns true if the FileHandle is writable.
      *  Definition depends upon the subclass implementing FileHandle.
      *  For example, if the FileHandle is of type Stream, writable() could return
      *  true when there is ample buffer space available for write() calls.
      */
-    bool writable() const { return poll(MBED_POLLOUT) & MBED_POLLOUT; }
+    bool writable() const
+    {
+        return poll(POLLOUT) & POLLOUT;
+    }
 
     /** Returns true if the FileHandle is readable.
      *  Definition depends upon the subclass implementing FileHandle.
      *  For example, if the FileHandle is of type Stream, readable() could return
      *  true when there is something available to read.
      */
-    bool readable() const { return poll(MBED_POLLIN) & MBED_POLLIN; }
+    bool readable() const
+    {
+        return poll(POLLIN) & POLLIN;
+    }
 
-    /** Register a callback on state change of the file operation like read/write
+    /** Register a callback on state change of the file.
      *
      *  The specified callback will be called on state changes such as when
      *  the file can be written to or read from.
@@ -207,36 +207,28 @@ public:
      *  The callback may be called in an interrupt context and should not
      *  perform expensive operations.
      *
+     *  Note! This is not intended as an attach-like asynchronous api, but rather
+     *  as a building block for constructing  such functionality.
+     *
+     *  The exact timing of when the registered function
+     *  is called is not guaranteed and susceptible to change. It should be used
+     *  as a cue to make read/write/poll calls to find the current state.
+     *
      *  @param func     Function to call on state change
      */
-    int attach(Callback<void(short events)> func);
+    void sigio(Callback<void()> func);
 
-protected:
+    /** Issue sigio to user - used by mbed::_poll_change */
+    void _send_sigio()
+    {
+        if (_callback) {
+            _callback();
+        }
+    }
 
-    Callback<void(short events)> _callback;
-
-    /** To be called by device when poll state changes - must be called for poll() to work */
-    void _poll_change(short events);
+private:
+    Callback<void()> _callback;
 };
-
-/** Placeholder for poll() - not yet implemented
- *  Think - can we use standard POLLIN from <poll.h> like we use SEEK_SET?
- *  Need local naming probably.
- *
- *  POLLIN, POLLOUT, POLLERR at least?
- */
-struct PollFH {
-    FileHandle *fh;
-    short events;
-    short revents;
-};
-
-/** TODO - document
- * @return number of file handles selected (for which revents is non-zero).
- * @return 0 if timed out with nothing selected.
- * @return -1 for error.
- */
-int mbed_poll(PollFH fhs[], unsigned nfhs, int timeout);
 
 /** Not a member function
  *  This call is equivalent to posix fdopen().
@@ -245,25 +237,8 @@ int mbed_poll(PollFH fhs[], unsigned nfhs, int timeout);
  *  @param fh, a pointer to an opened file descriptor
  *  @param mode, operation upon the file descriptor, e.g., 'wb+'*/
 
-std::FILE *mbed_fdopen(FileHandle *fh, const char *mode);
+std::FILE *fdopen(FileHandle *fh, const char *mode);
 
-/** XXX Think - how to do fileno() equivalent to map FILE * to FileHandle *? */
-/** Need toolchain-dependent code to get FILEHANDLE from FILE *, and then that needs to be
- * looked up in retarget.cpp's filehandles array.
- * Probably not needed for now.
- *
- * FileHandle *fileno(FILE *stream)
- * {
- *     int num = stream->_file;
- *     if (num < 3) {
- *          return NULL;
- *     }
- *     return filehandles[num-3];
- * }
- */
-
-
-/** @}*/
 } // namespace mbed
 
 #endif

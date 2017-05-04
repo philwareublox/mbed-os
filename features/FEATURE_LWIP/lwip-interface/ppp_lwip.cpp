@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include "platform/FileHandle.h"
+#include "platform/mbed_poll.h"
 #include "events/EventQueue.h"
 #if defined(FEATURE_COMMON_PAL)
 #include "mbed_trace.h"
@@ -96,7 +97,7 @@ static u32_t ppp_output(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx)
 
     PollFH fhs;
     fhs.fh = stream;
-    fhs.events = MBED_POLLOUT;
+    fhs.events = POLLOUT;
 
     // LWIP expects us to block on write
     // File handle will be in non-blocking mode, because of read events.
@@ -106,7 +107,7 @@ static u32_t ppp_output(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx)
     while (len != 0) {
         // Block forever until we're selected - don't care about reason we wake;
         // return from write should tell us what's up.
-        mbed_poll(&fhs, 1, -1);
+        poll(&fhs, 1, -1);
         // This write will be non-blocking, but blocking would be fine.
         ssize_t ret = stream->write(data, len);
         if (ret == -EAGAIN) {
@@ -244,9 +245,9 @@ static void ppp_input()
     // Non-blocking error check handler
     PollFH fhs;
     fhs.fh = my_stream;
-    fhs.events = MBED_POLLIN;
-    mbed_poll(&fhs, 1, 0);
-    if (fhs.revents & (MBED_POLLHUP|MBED_POLLERR|MBED_POLLNVAL)) {
+    fhs.events = POLLIN;
+    poll(&fhs, 1, 0);
+    if (fhs.revents & (POLLHUP|POLLERR|POLLNVAL)) {
         goto hup;
     }
 
@@ -271,7 +272,7 @@ hup:
     return;
 }
 
-static void stream_cb(short events) {
+static void stream_cb() {
     if (my_stream && !event_queued) {
         event_queued = true;
         if (event_queue->call(callback(ppp_input)) == 0) {
@@ -289,7 +290,7 @@ extern "C" err_t ppp_lwip_connect()
    err_t ret = ppp_connect(my_ppp_pcb, 0);
    // lwIP's ppp.txt says input must not be called until after connect
    if (ret == ERR_OK) {
-       my_stream->attach(callback(stream_cb));
+       my_stream->sigio(callback(stream_cb));
    } else {
        ppp_active = false;
    }
@@ -307,7 +308,7 @@ extern "C" err_t ppp_lwip_disconnect()
     sys_arch_sem_wait(&ppp_close_sem, 0);
 
     /* Detach callbacks, and put handle back to default blocking mode */
-    my_stream->attach(Callback<void(short events)>());
+    my_stream->sigio(Callback<void()>());
     my_stream->set_blocking(true);
     my_stream = NULL;
 

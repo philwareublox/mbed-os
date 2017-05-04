@@ -1,3 +1,19 @@
+/* mbed Microcontroller Library
+ * Copyright (c) 2017 ublox, ARM Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 /* ----------------------------------------------------------------
    APN stands for Access Point Name, a setting on your modem or phone
    that identifies an external network your phone can access for data 
@@ -13,29 +29,38 @@
    google: https://www.google.de/search?q=APN+list   
 ---------------------------------------------------------------- */
 
-//! helper to generate the APN string
+/**
+ * Helper to generate the APN string
+ */
 #define _APN(apn,username,password) apn "\0" username "\0" password "\0"
 
-//! helper to extract a field from the config string 
+/**
+ * Helper to extract a field from the cfg string
+ */
 #define _APN_GET(cfg) \
     *cfg ? cfg : NULL; \
     cfg  += strlen(cfg) + 1
-                    
-//! APN lookup struct
+
+/**
+ * APN lookup struct
+ */
 typedef struct { 
-    const char* mccmnc; //!< mobile country code (MCC) and mobile network code MNC  
-    const char* cfg;    //!< APN configuartion string, use _APN macro to generate
+    const char* mccmnc; /**< mobile country code (MCC) and mobile network code MNC */
+    const char* cfg;     /**<  APN configuartion string, use _APN macro to generate */
 } APN_t;
 
-//! default APN settings used by many networks
+/**
+ * Default APN settings used by many networks
+ */
 static const char* apndef = _APN("internet",,);
 
-/*! this is a list of special APNs for different network operators 
-    There is no need to enter the default apn internet in the table; 
-    apndef will be used if no entry matches.
-    
-    The APN without username/password have to be listed first.
-*/
+/**
+ * List of special APNs for different network operators.
+ *
+ * No need to add default, "internet" will be used as a default if no entry matches.
+ * The APN without username/password have to be listed first.
+ */
+
 static const APN_t apnlut[] = {
 // MCC Country
 //  { /* Operator */ "MCC-MNC[,MNC]" _APN(APN,USERNAME,PASSWORD) },
@@ -114,13 +139,18 @@ static const APN_t apnlut[] = {
     { /* Transatel */ "901-37", _APN("netgprs.com","tsl","tsl") },
 };
 
+/**
+ * Configuring APN by extraction from IMSI and matching the table.
+ *
+ * @param imsi  strinf containing IMSI
+ */
 inline const char* apnconfig(const char* imsi)
 {
     const char* config = NULL;
     if (imsi && *imsi) {
         // many carriers use internet without username and password, os use this as default
         // now try to lookup the setting for our table
-        for (unsigned int i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
+        for (int i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
             const char* p = apnlut[i].mccmnc;
             // check the MCC
             if ((0 == memcmp(imsi, p, 3))) {
@@ -138,7 +168,8 @@ inline const char* apnconfig(const char* imsi)
         }
     }
     // use default if not found
-    if (!config)
+    if (!config) {
         config = apndef;
+    }
     return config;
 }

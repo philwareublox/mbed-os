@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include "platform/BufferedSerial.h"
+#include "platform/mbed_poll.h"
 #ifdef MBED_CONF_RTOS_PRESENT
 #include "rtos/rtos.h"
 #endif
@@ -31,7 +32,7 @@ BufferedSerial::BufferedSerial(PinName tx, PinName rx, int baud) :
         _dcd(NULL)
 {
     /* Attatch IRQ routines to the serial device. */
-    SerialBase::attach(callback(this, &BufferedSerial::RxIRQ), RxIrq);
+    SerialBase::attach(callback(this, &BufferedSerial::rx_irq), RxIrq);
 }
 
 BufferedSerial::~BufferedSerial()
@@ -41,7 +42,7 @@ BufferedSerial::~BufferedSerial()
 
 void BufferedSerial::DCD_IRQ()
 {
-    _poll_change(MBED_POLLHUP);
+    _poll_change(this);
 }
 
 void BufferedSerial::set_data_carrier_detect(PinName DCD_pin, bool active_high)
@@ -127,9 +128,9 @@ ssize_t BufferedSerial::write(const void* buffer, size_t length)
 
     core_util_critical_section_enter();
     if (!_tx_irq_enabled) {
-        BufferedSerial::TxIRQ();                // only write to hardware in one place
+        BufferedSerial::tx_irq();                // only write to hardware in one place
         if (!_txbuf.empty()) {
-            SerialBase::attach(callback(this, &BufferedSerial::TxIRQ), TxIrq);
+            SerialBase::attach(callback(this, &BufferedSerial::tx_irq), TxIrq);
             _tx_irq_enabled = true;
         }
     }
@@ -170,7 +171,7 @@ ssize_t BufferedSerial::read(void* buffer, size_t length)
     return data_read;
 }
 
-bool BufferedSerial::HUP() const
+bool BufferedSerial::hup() const
 {
     return _dcd && _dcd->read() != 0;
 }
@@ -182,14 +183,14 @@ short BufferedSerial::poll(short events) const {
 
 
     if (!_rxbuf.empty()) {
-        revents |= MBED_POLLIN;
+        revents |= POLLIN;
     }
 
     /* POLLHUP and POLLOUT are mutually exclusive */
-    if (HUP()) {
-        revents |= MBED_POLLHUP;
+    if (hup()) {
+        revents |= POLLHUP;
     } else if (!_txbuf.full()) {
-        revents |= MBED_POLLOUT;
+        revents |= POLLOUT;
     }
 
     /*TODO Handle other event types */
@@ -207,7 +208,7 @@ void BufferedSerial::unlock(void)
     _mutex.unlock();
 }
 
-void BufferedSerial::RxIRQ(void)
+void BufferedSerial::rx_irq(void)
 {
     bool was_empty = _rxbuf.empty();
 
@@ -217,18 +218,19 @@ void BufferedSerial::RxIRQ(void)
         char data = SerialBase::_base_getc();
         if (!_rxbuf.full()) {
             _rxbuf.push(data);
+        } else {
             /* Drop - can we report in some way? */
         }
     }
 
     /* Report the File handler that data is ready to be read from the buffer. */
     if (was_empty && !_rxbuf.empty()) {
-        _poll_change(MBED_POLLIN);
+        _poll_change(this);
     }
 }
 
 // Also called from write to start transfer
-void BufferedSerial::TxIRQ(void)
+void BufferedSerial::tx_irq(void)
 {
     bool was_full = _txbuf.full();
 
@@ -246,11 +248,10 @@ void BufferedSerial::TxIRQ(void)
     }
 
     /* Report the File handler that data can be written to peripheral. */
-    if (was_full && !_txbuf.full() && !HUP()) {
-        _poll_change(MBED_POLLOUT);
+    if (was_full && !_txbuf.full() && !hup()) {
+        _poll_change(this);
     }
 }
-
 
 } //namespace mbed
 

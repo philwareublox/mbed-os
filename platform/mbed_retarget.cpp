@@ -121,6 +121,7 @@ static void init_serial() {
 #endif
 }
 
+#if MBED_CONF_FILESYSTEM_PRESENT
 static inline int openmode_to_posix(int openmode) {
     int posix = openmode;
 #ifdef __ARMCC_VERSION
@@ -155,6 +156,7 @@ static inline int openmode_to_posix(int openmode) {
 #endif
     return posix;
 }
+#endif
 
 extern "C" WEAK void mbed_sdk_init(void);
 extern "C" WEAK void mbed_sdk_init(void) {
@@ -951,7 +953,7 @@ static void mbed_set_unbuffered_stream(std::FILE *_file) {
 #endif
 }
 
-std::FILE *mbed_fdopen(FileHandle *fh, const char *mode)
+std::FILE *fdopen(FileHandle *fh, const char *mode)
 {
     char buf[12]; /* :0x12345678 + null byte */
     std::sprintf(buf, ":%p", fh);

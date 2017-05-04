@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2017 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@
 static bool modemOn;
 static bool gpsOn;
 
-void ublox_mdm_init(void) {
+void ublox_mdm_init(void)
+{
     gpio_t gpio;
     // start with modem disabled 
     gpio_init_out_ex(&gpio, MDMEN,     0);
@@ -45,7 +46,8 @@ void ublox_mdm_init(void) {
     while ((us_ticker_read() - start) < 50000);
 }
 
-void ublox_mdm_power_on(int usb) {
+void ublox_mdm_powerOn(int usb)
+{
     gpio_t gpio;
     // turn on the mode by enabling power with power on pin low and correct USB detect level
     gpio_init_out_ex(&gpio, MDMUSBDET,  usb ? 1 : 0);  // USBDET: 0=disabled, 1=enabled
@@ -59,7 +61,8 @@ void ublox_mdm_power_on(int usb) {
     }
 }
 
-void ublox_mdm_power_off(void) {
+void ublox_mdm_powerOff(void)
+{
     gpio_t gpio;
     if (modemOn) {
         // diable all level shifters
@@ -72,7 +75,8 @@ void ublox_mdm_power_off(void) {
     }
 }        
 
-void ublox_gps_power_on(void) {
+void ublox_gps_powerOn(void)
+{
     gpio_t gpio;
     if (!gpsOn) {
         // switch on power supply
@@ -83,7 +87,8 @@ void ublox_gps_power_on(void) {
     }
 }
 
-void ublox_gps_power_off(void) {
+void ublox_gps_powerOff(void)
+{
     gpio_t gpio;
     if (gpsOn) {
         gpio_init_out_ex(&gpio, MDMILVLOE, 0);   // ILVLEN: 0=disabled (i2c)

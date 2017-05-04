@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 #include "FileHandle.h"
-#include "Timer.h"
-#ifdef MBED_CONF_RTOS_PRESENT
-#include "rtos/Thread.h"
-#endif
 #include "platform/mbed_critical.h"
 
 namespace mbed {
@@ -36,69 +32,16 @@ off_t FileHandle::size()
     return size;
 }
 
-int FileHandle::attach(Callback<void(short events)> func) {
+void FileHandle::sigio(Callback<void()> func) {
     core_util_critical_section_enter();
     _callback = func;
     if (_callback) {
         short current_events = poll(0x7FFF);
         if (current_events) {
-            _callback(current_events);
+            _callback();
         }
     }
     core_util_critical_section_exit();
-    return 0;
-}
-
-// timeout -1 forever, or milliseconds
-int mbed_poll(PollFH fhs[], unsigned nfhs, int timeout)
-{
-    // Quick initial hack that spins
-    Timer timer;
-    if (timeout > 0) {
-        timer.start();
-    }
-
-    int count = 0;
-    for (;;) {
-        /* Scan the file handles */
-        for (unsigned n = 0; n < nfhs; n++) {
-            FileHandle *fh = fhs[n].fh;
-            short mask = fhs[n].events | MBED_POLLERR | MBED_POLLHUP | MBED_POLLNVAL;
-            if (fh) {
-                fhs[n].revents = fh->poll(mask) & mask;
-            } else {
-                fhs[n].revents = MBED_POLLNVAL;
-            }
-            if (fhs[n].revents) {
-                count++;
-            }
-        }
-
-        if (count) {
-            break;
-        }
-
-        /* Nothing selected - this is where timeout handling would be needed */
-        if (timeout == 0 || (timeout > 0 && timer.read_ms() > timeout)) {
-            break;
-        }
-#ifdef MBED_CONF_RTOS_PRESENT
-        // TODO - proper blocking
-        // wait for condition variable, wait queue whatever here
-        rtos::Thread::yield();
-#endif
-    }
-    return count;
-}
-
-void FileHandle::_poll_change(short events)
-{
-    // TODO, will depend on how we implement poll
-
-    // Also, do the user callback
-    if (_callback) {
-        _callback(events);
-    }
 }
 
 } // namespace mbed

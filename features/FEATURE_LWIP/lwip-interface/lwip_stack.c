@@ -16,6 +16,7 @@
 
 #include "nsapi.h"
 #include "mbed_interface.h"
+#include "mbed_assert.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -555,7 +556,7 @@ nsapi_error_t mbed_lwip_bringup(bool dhcp, bool ppp, const char *ip, const char 
         netif_set_up(&lwip_netif);
     }
 
-#if LWIP_DCHP
+#if LWIP_DHCP
     // Connect to the network
     lwip_dhcp = dhcp;
 

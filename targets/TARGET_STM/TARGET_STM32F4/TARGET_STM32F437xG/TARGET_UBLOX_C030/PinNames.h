@@ -70,25 +70,27 @@ typedef enum {
     NC = -1,
 
     // Power
-    PWR3V3 = PE_0,    // 3.3V rail for the Arduino interface,
-                      // user LEDs and GNSS power, should be
-                      // set to open drain output
+    PWR3V3 = PE_0,       // 3.3V rail for the Arduino interface,
+                         // user LEDs and GNSS power, should be
+                         // set to open drain output
     
     // GNSS
-    GNSSEN  = PA_15,  // VCC_IO to GNSS, should be set to push-pull, no pull-up, output
+    GNSSEN  = PA_15,     // VCC_IO to GNSS, should be set to push-pull, no pull-up, output
     GNSSTXD = PC_6,
     GNSSRXD = PC_7,
     
     // Cellular modem (a DCE)
-    MDMPWRON  = PE_14, // Power (active high)
-    MDMRST    = PB_5,  // Reset (active low)
-    MDMTXD    = PD_5,  // Transmit Data
-    MDMRXD    = PD_6,  // Receive Data
-    MDMCTS    = PD_3,  // Clear to Send
-    MDMRTS    = PD_4,  // Request to Send
-    MDMDCD    = NC,    // DCD line not connected
-    MDMGPIO2  = PD_1,  // 
-    MDMGPIO3  = PB_4,  //
+    MDMPWRON  = PE_14,   // Power (active high)
+    MDMRST    = PB_5,    // Reset (active low)
+    MDMTXD    = PD_5,    // Transmit Data
+    MDMRXD    = PD_6,    // Receive Data
+    MDMCTS    = PD_3,    // Clear to Send
+    MDMRTS    = PD_4,    // Request to Send
+    MDMDCD    = NC,      // DCD line not connected
+    MDMGPIO2  = PD_1,    // 
+    MDMGPIO3  = PB_4,    //
+    MDMDCD_POLARITY = 0, // Doesn't matter as it's not connected but needs
+                         // to be defined or the code won't compile
 
     // Board Pins
     // A0-A5

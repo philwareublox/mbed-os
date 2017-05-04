@@ -46,7 +46,7 @@
 class UbloxCellularInterfaceExt : public UbloxCellularInterface {
 
 public:
-    UbloxCellularInterfaceExt(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE, bool use_USB = false);
+    UbloxCellularInterfaceExt(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE);
     ~UbloxCellularInterfaceExt();
 
 

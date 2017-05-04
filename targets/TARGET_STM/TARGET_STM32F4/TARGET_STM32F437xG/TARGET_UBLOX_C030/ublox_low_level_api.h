@@ -5,11 +5,7 @@
 extern "C" {
 #endif
 
-void ublox_mdm_init(void);
-
-void ublox_mdm_power_on(int usb);
-
-void ublox_mdm_power_off(void);
+void ublox_board_init(void);
 
 #ifdef __cplusplus
 }

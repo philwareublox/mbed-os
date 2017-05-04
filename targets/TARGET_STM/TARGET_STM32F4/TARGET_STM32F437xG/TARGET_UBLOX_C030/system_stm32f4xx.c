@@ -236,7 +236,7 @@ void SystemInit(void)
   TIM_MST_RESET_OFF;
 
   // Initialise the board
-  ublox_mdm_init();
+  ublox_board_init();
 }
 
 /**

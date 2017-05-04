@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "ublox_low_level_api.h"
+#include "modem_api.h"
 #include "UbloxCellularInterface.h"
 #include "nsapi_ppp.h"
 #include "BufferedSerial.h"
@@ -31,6 +31,7 @@
  * MACROS
  **********************************************************************/
 
+#define OUTPUT_ENTER_KEY  "\r"
 #define AT_PARSER_BUFFER_SIZE           256
 #define AT_PARSER_TIMEOUT_MILLISECONDS  8 * 1000
 
@@ -38,13 +39,16 @@
  * STATIC VARIABLES
  **********************************************************************/
 
+// Modem object for the device
+static modem_t mdm_object;
+
 // A callback function that will be called if the PPP connection goes down.
-void (*callback_fptr)(nsapi_error_t);
+static void (*callback_fptr)(nsapi_error_t);
 
 // The ppp_connection_up() callback, which goes out via the PPP stack and has
 // to be a static function, needs access to the member variable
 // _dev_info->ppp_connection_up, so we need to keep a pointer to it here.
-volatile bool * ppp_connection_up_ptr = NULL;
+static volatile bool * ppp_connection_up_ptr = NULL;
 
 /**********************************************************************
  * STATIC CALLBACKS
@@ -69,17 +73,19 @@ static void ppp_connection_down_cb(nsapi_error_t err)
 void UbloxCellularInterface::setup_at_parser()
 {
     if (_at == NULL) {
-        _at = new ATParser(*_fh, AT_PARSER_BUFFER_SIZE, AT_PARSER_TIMEOUT_MILLISECONDS,
-                             _debug_trace_on ? true : false);
+        _at = new ATParser(_fh, OUTPUT_ENTER_KEY, AT_PARSER_BUFFER_SIZE,
+                           AT_PARSER_TIMEOUT_MILLISECONDS,
+                           _debug_trace_on ? true : false);
 
         // Error cases, out of band handling
-        _at->oob("ERROR", this, &UbloxCellularInterface::parser_abort);
-        _at->oob("+CME ERROR", this, &UbloxCellularInterface::parser_abort);
-        _at->oob("+CMS ERROR", this, &UbloxCellularInterface::parser_abort);
+        _at->oob("ERROR", callback(this, &UbloxCellularInterface::parser_abort));
+        _at->oob("+CME ERROR", callback(this, &UbloxCellularInterface::parser_abort));
+        _at->oob("+CMS ERROR", callback(this, &UbloxCellularInterface::parser_abort));
 
         // URCs, handled out of band
-        _at->oob("+CMT", this, &UbloxCellularInterface::CMT_URC);
-        _at->oob("+CMTI", this, &UbloxCellularInterface::CMTI_URC);
+        //_at->oob("+CMT", this, &UbloxCellularInterface::CMT_URC);
+        _at->oob("+CMT", callback(this, &UbloxCellularInterface::CMT_URC));
+        _at->oob("+CMTI", callback(this, &UbloxCellularInterface::CMTI_URC));
     }
 }
 
@@ -279,29 +285,17 @@ bool UbloxCellularInterface::nwk_registration_status(device_type dev)
 bool UbloxCellularInterface::power_up_modem()
 {
     bool success = false;
-    DigitalOut pwrOn(MDMPWRON, 1);
-    DigitalIn cts(MDMCTS);
-
     LOCK();
 
-    // Initialise GPIO lines
+    /* Initialize GPIO lines */
     tr_debug("Powering up modem...");
-    ublox_mdm_power_on(_useUSB);
-    wait_ms(500);
+    modem_init(&mdm_object);
+    /* Give modem a little time to settle down */
+    wait_ms(250);
 
-    // The power-on call takes the module out of reset, here we toggle the power-on
-    // PIN to do the actual waking up, see Sara-U2_DataSheet_(UBX-13005287).pdf section
-    // 4.2.6.
     for (int retry_count = 0; !success && (retry_count < 20); retry_count++) {
-        pwrOn = 0;
-        wait_us(50);
-        pwrOn = 1;
-        wait_ms(10);
-
-        while (cts) {
-            wait_ms(500);
-        }
-
+        modem_power_up(&mdm_object);
+        wait_ms(500);
         // Modem tends to spit out noise during power up - don't confuse the parser
         _at->flush();
         _at->setTimeout(1000);
@@ -318,6 +312,7 @@ bool UbloxCellularInterface::power_up_modem()
         // and Ublox AT commands manual
         success = _at->send("ATE0;" // Turn off modem echoing
                             "+CMEE=2;" // Turn on verbose responses
+                            "&K0" //turn off RTC/CTS handshaking
                             "+IPR=%d;" // Set baud rate
                             "&C1;"  // Set DCD circuit(109), changes in accordance with the carrier detect status
                             "&D0", MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE) && // Set DTR circuit, we ignore the state change of DTR
@@ -343,7 +338,8 @@ void UbloxCellularInterface::power_down_modem()
     }
 
     // Now do a hard power-off
-    ublox_mdm_power_off();
+    modem_power_down(&mdm_object);
+    modem_deinit(&mdm_object);
 
     UNLOCK();
 }
@@ -590,18 +586,18 @@ bool UbloxCellularInterface::set_ATD()
 
 // Enable or disable SIM pin check lock.
 // NOTE: the AT interface must be locked before this is called
-nsapi_error_t UbloxCellularInterface::do_add_remove_sim_pin_check(bool pin_check_disabled)
+nsapi_error_t UbloxCellularInterface::do_check_sim_pin(bool check)
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
 
     if (_pin != NULL) {
-        if (_sim_pin_check_enabled && pin_check_disabled) {
+        if (_sim_pin_check_enabled && !check) {
             // Disable the SIM lock
             if (_at->send("AT+CLCK=\"SC\",0,\"%s\"", _pin) && _at->recv("OK")) {
                 _sim_pin_check_enabled = false;
                 nsapi_error = NSAPI_ERROR_OK;
             }
-        } else if (!_sim_pin_check_enabled && !pin_check_disabled) {
+        } else if (!_sim_pin_check_enabled && check) {
             // Enable the SIM lock
             if (_at->send("AT+CLCK=\"SC\",1,\"%s\"", _pin) && _at->recv("OK")) {
                 _sim_pin_check_enabled = true;
@@ -682,24 +678,20 @@ NetworkStack *UbloxCellularInterface::get_stack()
  **********************************************************************/
 
 // Constructor.
-UbloxCellularInterface::UbloxCellularInterface(bool debugOn, PinName tx, PinName rx, int baud, bool use_USB)
+UbloxCellularInterface::UbloxCellularInterface(bool debugOn, PinName tx, PinName rx, int baud)
 {
     _pin = NULL;
     _at = NULL;
     _apn = "internet";
     _uname = NULL;
     _pwd = NULL;
-    _useUSB = use_USB;
     _debug_trace_on = false;
     _modem_initialised = false;
     _sim_pin_check_enabled = false;
     _sim_pin_check_change_pending = false;
-    _sim_pin_check_change_pending_disabled_value = false;
+    _sim_pin_check_change_pending_enabled_value = false;
     _sim_pin_change_pending = false;
     _sim_pin_change_pending_new_pin_value = NULL;
-
-    // USB is not currently supported
-    MBED_ASSERT(!use_USB);
 
      // Set up File Handle
     _fh = new BufferedSerial(tx, rx, baud);
@@ -729,7 +721,7 @@ UbloxCellularInterface::~UbloxCellularInterface()
 }
 
 // Set the callback to be called in case the connection is lost.
-void UbloxCellularInterface::connection_lost_notification_cb(void (*fptr)(nsapi_error_t))
+void UbloxCellularInterface::connection_status_cb(void (*fptr)(nsapi_error_t))
 {
     callback_fptr = fptr;
 }
@@ -753,10 +745,8 @@ nsapi_error_t UbloxCellularInterface::init(const char *sim_pin)
         // As soon as we get into data mode, we would like to attach an interrupt line
         // to DCD line.
         // Here, we detach the line
-        if (!_useUSB) {
-            BufferedSerial *serial = static_cast<BufferedSerial *>(_fh);
-            serial->set_data_carrier_detect(NC);
-        }
+        BufferedSerial *serial = static_cast<BufferedSerial *>(_fh);
+        serial->set_data_carrier_detect(NC);
 
         if (power_up_modem()) {
             if (sim_pin != NULL) {
@@ -871,7 +861,7 @@ nsapi_error_t UbloxCellularInterface::connect()
 
             // Perform any pending SIM actions
             if (_sim_pin_check_change_pending) {
-                nsapi_error = do_add_remove_sim_pin_check(_sim_pin_check_change_pending_disabled_value);
+                nsapi_error = do_check_sim_pin(_sim_pin_check_change_pending_enabled_value);
                 _sim_pin_check_change_pending = false;
             }
             if (_sim_pin_change_pending) {
@@ -895,10 +885,8 @@ nsapi_error_t UbloxCellularInterface::connect()
                 // Here we would like to attach an interrupt line to the DCD PIN
                 // We cast back the serial interface from the file handle and set
                 // the DCD line.
-                if(!_useUSB) {
-                    BufferedSerial *serial = static_cast<BufferedSerial *>(_fh);
-                    serial->set_data_carrier_detect(MDMDCD);
-                }
+                BufferedSerial *serial = static_cast<BufferedSerial *>(_fh);
+                serial->set_data_carrier_detect(MDMDCD, MDMDCD_POLARITY);
 
                 // Initialise PPP
                 // mbed_ppp_init() is a blocking call, it will block until
@@ -936,7 +924,7 @@ nsapi_error_t UbloxCellularInterface::disconnect()
 }
 
 // Enable or disable SIM PIN check lock.
-nsapi_error_t UbloxCellularInterface::add_remove_sim_pin_check(bool pin_check_disabled, bool immediate, const char *sim_pin)
+nsapi_error_t UbloxCellularInterface::check_sim_pin(bool check, bool immediate, const char *sim_pin)
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_AUTH_FAILURE;
     LOCK();
@@ -948,12 +936,12 @@ nsapi_error_t UbloxCellularInterface::add_remove_sim_pin_check(bool pin_check_di
     if (immediate) {
         nsapi_error = init();
         if (nsapi_error == NSAPI_ERROR_OK) {
-            nsapi_error = do_add_remove_sim_pin_check(pin_check_disabled);
+            nsapi_error = do_check_sim_pin(check);
         }
     } else {
         nsapi_error = NSAPI_ERROR_OK;
         _sim_pin_check_change_pending = true;
-        _sim_pin_check_change_pending_disabled_value = pin_check_disabled;
+        _sim_pin_check_change_pending_enabled_value = check;
     }
 
     UNLOCK();

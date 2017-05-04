@@ -73,8 +73,8 @@ int UbloxCellularInterfaceExt::findProfile(int handle)
  **********************************************************************/
 
 // Constructor.
-UbloxCellularInterfaceExt::UbloxCellularInterfaceExt(bool debugOn, PinName tx, PinName rx, int baud, bool use_USB):
-                           UbloxCellularInterface(debugOn, tx, rx, baud, use_USB)
+UbloxCellularInterfaceExt::UbloxCellularInterfaceExt(bool debugOn, PinName tx, PinName rx, int baud):
+                           UbloxCellularInterface(debugOn, tx, rx, baud)
 {
     // Zero Cell Locate stuff
     _locRcvPos = 0;
@@ -87,7 +87,7 @@ UbloxCellularInterfaceExt::UbloxCellularInterfaceExt(bool debugOn, PinName tx, P
     }
 
     // URC handler for HTTP
-    _at->oob("+UUHTTPCR", this, &UbloxCellularInterfaceExt::UUHTTPCR_URC);
+    _at->oob("+UUHTTPCR", callback(this, &UbloxCellularInterfaceExt::UUHTTPCR_URC));
 }
 
 // Destructor.

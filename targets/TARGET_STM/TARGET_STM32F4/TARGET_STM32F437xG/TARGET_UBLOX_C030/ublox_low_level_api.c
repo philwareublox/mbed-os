@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include "gpio_api.h"
 
-void ublox_mdm_init(void) {
+void ublox_board_init(void) {
     gpio_t gpio;
 
     // Enable power to 3V3
@@ -38,16 +38,4 @@ void ublox_mdm_init(void) {
     gpio_init_out_ex(&gpio, LED3,      1);
 }
 
-void ublox_mdm_power_on(int usb) {
-    gpio_t gpio;
-
-    // Take us out of reset
-    gpio_init_out_ex(&gpio, MDMRST,    1);
-}
-
-void ublox_mdm_power_off(void) {
-    gpio_t gpio;
-
-    // Back into reset
-    gpio_init_out_ex(&gpio, MDMRST, 0);
-}
+// End Of File

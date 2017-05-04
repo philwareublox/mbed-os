@@ -139,12 +139,12 @@ class NetworkStack;
 /** UbloxCellularInterface class.
  *
  *  This interface serves as the controller/driver for the u-blox
- *  C030 board.
+ *  C030 and C027 boards.
  */
 class UbloxCellularInterface : public CellularInterface {
 
 public:
-    UbloxCellularInterface(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE, bool use_USB = false);
+    UbloxCellularInterface(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE);
     ~UbloxCellularInterface();
     /** Initialise the modem, ready for use.
      *
@@ -223,19 +223,19 @@ public:
      *
      * Can be used to enable or disable SIM PIN check at device startup.
      *
-     * @param pin_check_disabled  can be set to true if the SIM PIN check is supposed
-     *                            to be disabled and vice versa.
-     * @param immediate           if true, change the SIM PIN now, else set a flag
-     *                            and make the change only when connect() is called.
-     *                            If this is true and init() has not been called previously,
-     *                            it will be called first.
-     * @param sim_pin             the current SIM PIN, must be a const.  If this is not
-     *                            provided, the SIM PIN must have previously been set by a
-     *                            call to set_SIM_pin().
-     * @return                    0 on success, negative error code on failure.
+     * @param check        can be set to true if the SIM PIN check is supposed
+     *                     to be enabled and vice versa.
+     * @param immediate    if true, change the SIM PIN now, else set a flag
+     *                     and make the change only when connect() is called.
+     *                     If this is true and init() has not been called previously,
+     *                     it will be called first.
+     * @param sim_pin      the current SIM PIN, must be a const.  If this is not
+     *                     provided, the SIM PIN must have previously been set by a
+     *                     call to set_SIM_pin().
+     * @return             0 on success, negative error code on failure.
      */
-    nsapi_error_t add_remove_sim_pin_check(bool pin_check_disabled, bool immediate = false,
-                                           const char *sim_pin = NULL);
+    nsapi_error_t check_sim_pin(bool check, bool immediate = false,
+                                const char *sim_pin = NULL);
 
     /** Change the PIN for the SIM card.
      *
@@ -287,11 +287,10 @@ public:
      *
      * @param fptr     the function to call.
      */
-    void connection_lost_notification_cb(void (*fptr)(nsapi_error_t));
+    void connection_status_cb(void (*fptr)(nsapi_error_t));
 
 private:
     FileHandle *_fh;
-    bool _useUSB;
     const char *_pin;
     const char *_apn;
     const char *_uname;
@@ -300,7 +299,7 @@ private:
     bool _modem_initialised;
     bool _sim_pin_check_enabled;
     bool _sim_pin_check_change_pending;
-    bool _sim_pin_check_change_pending_disabled_value;
+    bool _sim_pin_check_change_pending_enabled_value;
     bool _sim_pin_change_pending;
     const char *_sim_pin_change_pending_new_pin_value;
     void setup_at_parser();
@@ -328,7 +327,7 @@ private:
     bool set_CNMI();
     bool set_ATD();
     void parser_abort();
-    nsapi_error_t do_add_remove_sim_pin_check(bool pin_check_disabled);
+    nsapi_error_t do_check_sim_pin(bool check);
     nsapi_error_t do_change_sim_pin(const char *new_pin);
     void CMTI_URC();
     void CMT_URC();

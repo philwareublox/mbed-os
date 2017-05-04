@@ -185,14 +185,14 @@ void test_connect_preset_credentials() {
 
 // Test adding and using a SIM pin, then removing it, using the pending
 // mechanism where the change doesn't occur until connect() is called
-void test_add_remove_sim_pin_pending() {
+void test_check_sim_pin_pending() {
 
     pInterface->deinit();
 
     // Enable PIN checking (which will use the current PIN)
     // and also flag that the PIN should be changed to TEST_ALT_PIN,
     // then try connecting
-    pInterface->add_remove_sim_pin_check(false);
+    pInterface->check_sim_pin(true);
     pInterface->change_sim_pin(TEST_ALT_PIN);
     TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
@@ -216,7 +216,7 @@ void test_add_remove_sim_pin_pending() {
 
     // Remove PIN checking again and check that it no
     // longer matters what the PIN is
-    pInterface->add_remove_sim_pin_check(true);
+    pInterface->check_sim_pin(false);
     TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -232,15 +232,15 @@ void test_add_remove_sim_pin_pending() {
 
 // Test adding and using a SIM pin, then removing it, using the immediate
 // mechanism
-void test_add_remove_sim_pin_immediate() {
+void test_check_sim_pin_immediate() {
 
     pInterface->deinit();
-    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pInterface->connection_status_cb(ppp_connection_down_cb);
 
     // Enable PIN checking (which will use the current PIN), change
     // the PIN to TEST_ALT_PIN, then try connecting after powering on and
     // off the modem
-    pInterface->add_remove_sim_pin_check(false, true, TEST_DEFAULT_PIN);
+    pInterface->check_sim_pin(true, true, TEST_DEFAULT_PIN);
     pInterface->change_sim_pin(TEST_ALT_PIN, true);
     pInterface->deinit();
     pInterface->init(NULL);
@@ -248,7 +248,7 @@ void test_add_remove_sim_pin_immediate() {
     use_connection(pInterface);
     drop_connection(pInterface);
 
-    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pInterface->connection_status_cb(ppp_connection_down_cb);
 
     // Now change the PIN back to what it was before
     pInterface->change_sim_pin(TEST_DEFAULT_PIN, true);
@@ -259,11 +259,11 @@ void test_add_remove_sim_pin_immediate() {
     use_connection(pInterface);
     drop_connection(pInterface);
 
-    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pInterface->connection_status_cb(ppp_connection_down_cb);
 
     // Remove PIN checking again and check that it no
     // longer matters what the PIN is
-    pInterface->add_remove_sim_pin_check(true, true);
+    pInterface->check_sim_pin(false, true);
     pInterface->deinit();
     pInterface->init(TEST_INCORRECT_PIN);
     TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
@@ -283,7 +283,7 @@ void test_connect_local_instance_last_test() {
     UbloxCellularInterface *pLocalInterface = NULL;
 
     pLocalInterface = new UbloxCellularInterface(true);
-    pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pLocalInterface->connection_status_cb(ppp_connection_down_cb);
 
     TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pLocalInterface);
@@ -291,7 +291,7 @@ void test_connect_local_instance_last_test() {
     delete pLocalInterface;
 
     pLocalInterface = new UbloxCellularInterface(true);
-    pLocalInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pLocalInterface->connection_status_cb(ppp_connection_down_cb);
 
     TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pLocalInterface);
@@ -314,8 +314,8 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 Case cases[] = {
     Case("Connect with credentials", test_connect_credentials),
     Case("Connect with preset credentials", test_connect_preset_credentials),
-    Case("Add and remove SIM pin, pending", test_add_remove_sim_pin_pending),
-    Case("Add and remove SIM pin, immediate", test_add_remove_sim_pin_immediate),
+    Case("Check SIM pin, pending", test_check_sim_pin_pending),
+    Case("Check SIM pin, immediate", test_check_sim_pin_immediate),
     Case("Connect using local instance, must be last test", test_connect_local_instance_last_test)
 
 };
@@ -333,7 +333,7 @@ int main() {
     mbed_trace_mutex_wait_function_set(lock);
     mbed_trace_mutex_release_function_set(unlock);
 
-    pInterface->connection_lost_notification_cb(ppp_connection_down_cb);
+    pInterface->connection_status_cb(ppp_connection_down_cb);
     
     // Run tests
     return !Harness::run(specification);

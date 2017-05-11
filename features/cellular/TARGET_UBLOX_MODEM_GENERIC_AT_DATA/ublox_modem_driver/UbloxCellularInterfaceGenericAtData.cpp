@@ -115,9 +115,9 @@ bool UbloxCellularInterfaceGenericAtData::activateProfileReuseExternal(void)
     // If a context has been found, use it
     if ((cid != -1) && (_at->send("AT+UPSD=" PROFILE ",100,%d", cid) && _at->recv("OK"))) {
         // Activate, waiting 30 seconds for the connection to be made
-        _at->setTimeout(30000);
+        _at->set_timeout(30000);
         success = _at->send("AT+UPSDA=" PROFILE ",3") && _at->recv("OK");
-        _at->setTimeout(1000);
+        _at->set_timeout(1000);
     }
 
     return success;
@@ -139,10 +139,10 @@ bool UbloxCellularInterfaceGenericAtData::activateProfileByCid(int cid,
         _at->send("AT+UPSD=" PROFILE ",100,%d", cid) && _at->recv("OK")) {
 
         // Wait 30 seconds for the connection to be made
-        _at->setTimeout(30000);
+        _at->set_timeout(30000);
         // Activate the protocol
         success = _at->send("AT+UPSDA=" PROFILE ",3") && _at->recv("OK");
-        _at->setTimeout(1000);
+        _at->set_timeout(1000);
     }
 
     return success;

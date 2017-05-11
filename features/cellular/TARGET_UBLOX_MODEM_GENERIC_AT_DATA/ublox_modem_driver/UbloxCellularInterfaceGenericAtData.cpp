@@ -25,7 +25,7 @@
 #endif
 
 /**********************************************************************
- * PROTECTED METHODS
+ * PROTECTED METHODS: GENERAL
  **********************************************************************/
 
 // Get the next set of credentials, based on IMSI.
@@ -212,6 +212,10 @@ bool UbloxCellularInterfaceGenericAtData::disconnectModemStack()
     UNLOCK();
     return success;
 }
+
+/**********************************************************************
+ * PROTECTED METHODS: NETWORK INTERFACE and SOCKETS
+ **********************************************************************/
 
 // Gain access to us.
 NetworkStack *UbloxCellularInterfaceGenericAtData::get_stack()
@@ -622,6 +626,10 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::getsockopt(nsapi_socket_t han
     return NSAPI_ERROR_UNSUPPORTED;
 }
 
+/**********************************************************************
+ * PRIVATE METHODS
+ **********************************************************************/
+
 // Find or create a socket from the list.
 UbloxCellularInterfaceGenericAtData::SockCtrl * UbloxCellularInterfaceGenericAtData::findSocket(int modemHandle)
 {
@@ -770,7 +778,7 @@ void  UbloxCellularInterfaceGenericAtData::set_credentials(const char *apn,
 }
 
 // Set PIN.
-void UbloxCellularInterfaceGenericAtData::set_SIM_pin(const char *pin) {
+void UbloxCellularInterfaceGenericAtData::set_sim_pin(const char *pin) {
     set_pin(pin);
 }
 
@@ -946,7 +954,7 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::change_sim_pin(const char *ne
 }
 
 // Determine if the connection is up.
-bool UbloxCellularInterfaceGenericAtData::isConnected()
+bool UbloxCellularInterfaceGenericAtData::is_connected()
 {
     return get_ip_address() != NULL;
 }

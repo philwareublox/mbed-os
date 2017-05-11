@@ -137,7 +137,7 @@ static void use_connection(UbloxCellularInterfaceGenericAtData *pModem)
     const char * netMask = pModem->get_netmask();
     const char * gateway = pModem->get_gateway();
 
-    TEST_ASSERT(pModem->isConnected());
+    TEST_ASSERT(pModem->is_connected());
 
     TEST_ASSERT(ipAddress != NULL);
     tr_debug ("IP address %s.", ipAddress);
@@ -156,7 +156,7 @@ static void drop_connection(UbloxCellularInterfaceGenericAtData *pModem)
     TEST_ASSERT(pModem->disconnect() == 0);
     TEST_ASSERT(connection_has_gone_down);
     connection_has_gone_down = false;
-    TEST_ASSERT(!pModem->isConnected());
+    TEST_ASSERT(!pModem->is_connected());
 }
 
 // ----------------------------------------------------------------
@@ -208,7 +208,7 @@ void test_check_sim_pin_pending() {
 
     // Check that it was changed back, and this time
     // use the other way of entering the PIN
-    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    pInterface->set_sim_pin(TEST_DEFAULT_PIN);
     TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -227,7 +227,7 @@ void test_check_sim_pin_pending() {
     drop_connection(pInterface);
 
     // Put the SIM pin back to the correct value for any subsequent tests
-    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    pInterface->set_sim_pin(TEST_DEFAULT_PIN);
 }
 
 // Test adding and using a SIM pin, then removing it, using the immediate
@@ -253,7 +253,7 @@ void test_check_sim_pin_immediate() {
     // Now change the PIN back to what it was before
     pInterface->change_sim_pin(TEST_DEFAULT_PIN, true);
     pInterface->deinit();
-    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    pInterface->set_sim_pin(TEST_DEFAULT_PIN);
     TEST_ASSERT(pInterface->init(NULL));
     TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
@@ -271,7 +271,7 @@ void test_check_sim_pin_immediate() {
     drop_connection(pInterface);
 
     // Put the SIM pin back to the correct value for any subsequent tests
-    pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
+    pInterface->set_sim_pin(TEST_DEFAULT_PIN);
 }
 
 // Test being able to connect with a local instance of the driver

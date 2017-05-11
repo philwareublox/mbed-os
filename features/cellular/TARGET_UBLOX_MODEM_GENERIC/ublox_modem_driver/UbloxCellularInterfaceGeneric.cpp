@@ -55,7 +55,7 @@ static void ppp_connection_down_cb(nsapi_error_t err)
 }
 
 /**********************************************************************
- * PRIVATE METHODS: GENERAL
+ * PRIVATE METHODS
  **********************************************************************/
 
 // Send the credentials to the modem.
@@ -159,7 +159,7 @@ void  UbloxCellularInterfaceGeneric::set_credentials(const char *apn,
 }
 
 // Set PIN.
-void UbloxCellularInterfaceGeneric::set_SIM_pin(const char *pin) {
+void UbloxCellularInterfaceGeneric::set_sim_pin(const char *pin) {
     set_pin(pin);
 }
 
@@ -332,7 +332,7 @@ nsapi_error_t UbloxCellularInterfaceGeneric::change_sim_pin(const char *new_pin,
 }
 
 // Determine if PPP is up.
-bool UbloxCellularInterfaceGeneric::isConnected()
+bool UbloxCellularInterfaceGeneric::is_connected()
 {
     return _ppp_connection_up;
 }

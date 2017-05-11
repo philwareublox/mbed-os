@@ -56,7 +56,7 @@ public:
      *
      *  @param sim_pin      PIN for the SIM card.
      */
-    virtual void set_SIM_pin(const char *sim_pin);
+    virtual void set_sim_pin(const char *sim_pin);
 
     /** Connect to the cellular network and start the interface.
      *
@@ -144,7 +144,7 @@ public:
      *                      connected to an external packet data network using PPP, isConnected()
      *                      API returns true and false otherwise.
      */
-    virtual bool isConnected();
+    virtual bool is_connected();
 
     /** Get the local IP address
      *

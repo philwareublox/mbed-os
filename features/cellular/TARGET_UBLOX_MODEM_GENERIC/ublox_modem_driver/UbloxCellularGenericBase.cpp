@@ -274,14 +274,14 @@ bool UbloxCellularGenericBase::power_up_modem()
         wait_ms(500);
         // Modem tends to spit out noise during power up - don't confuse the parser
         _at->flush();
-        _at->setTimeout(1000);
+        _at->set_timeout(1000);
 
         if (_at->send("AT") && _at->recv("OK")) {
             success = true;
         }
     }
 
-    _at->setTimeout(8000);
+    _at->set_timeout(8000);
 
     if (success) {
         success = _at->send("ATE0;" // Turn off modem echoing

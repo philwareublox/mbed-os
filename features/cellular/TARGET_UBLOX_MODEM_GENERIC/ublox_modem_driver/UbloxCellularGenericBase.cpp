@@ -31,8 +31,18 @@
  **********************************************************************/
 
 #define OUTPUT_ENTER_KEY  "\r"
-#define AT_PARSER_BUFFER_SIZE           256
-#define AT_PARSER_TIMEOUT_MILLISECONDS  8 * 1000
+
+#if MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_BUFFER_SIZE
+#define AT_PARSER_BUFFER_SIZE   MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_BUFFER_SIZE
+#else
+#define AT_PARSER_BUFFER_SIZE   256
+#endif
+
+#if MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_TIMEOUT
+#define AT_PARSER_TIMEOUT       MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_TIMEOUT
+#else
+#define AT_PARSER_TIMEOUT       8*1000 // Milliseconds
+#endif
 
 /**********************************************************************
  * STATIC VARIABLES
@@ -50,7 +60,7 @@ void UbloxCellularGenericBase::setup_at_parser()
 {
     if (_at == NULL) {
         _at = new ATParser(_fh, OUTPUT_ENTER_KEY, AT_PARSER_BUFFER_SIZE,
-                           AT_PARSER_TIMEOUT_MILLISECONDS,
+                           AT_PARSER_TIMEOUT,
                            _debug_trace_on ? true : false);
 
         // Error cases, out of band handling
@@ -289,7 +299,7 @@ bool UbloxCellularGenericBase::power_up_modem()
                             "&K0" //turn off RTC/CTS handshaking
                             "+IPR=%d;" // Set baud rate
                             "&C1;"  // Set DCD circuit(109), changes in accordance with the carrier detect status
-                            "&D0", MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE) && // Set DTR circuit, we ignore the state change of DTR
+                            "&D0", MBED_CONF_UBLOX_CELL_GEN_DRV_BAUD_RATE) && // Set DTR circuit, we ignore the state change of DTR
                   _at->recv("OK");
     }
 

@@ -1,5 +1,5 @@
 {
-    "name": "ublox-modem-generic", 
+    "name": "ublox-cell-gen-drv", 
         "config": {
             "baud-rate": 115200,
             "at-parser-buffer-size": 256,

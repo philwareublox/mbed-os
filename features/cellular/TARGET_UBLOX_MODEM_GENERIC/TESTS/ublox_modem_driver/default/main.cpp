@@ -2,14 +2,16 @@
 #include "greentea-client/test_env.h"
 #include "unity.h"
 #include "utest.h"
-#include "TARGET_UBLOX_MODEM_GENERIC/ublox_modem_driver/UbloxCellularInterface.h"
-#include "ublox_low_level_api.h"
+#include "TARGET_UBLOX_MODEM_GENERIC/ublox_modem_driver/UbloxCellularInterfaceGeneric.h"
 #include "UDPSocket.h"
 #include "FEATURE_COMMON_PAL/nanostack-libservice/mbed-client-libservice/common_functions.h"
 #include "mbed_trace.h"
 #define TRACE_GROUP "TEST"
 
 using namespace utest::v1;
+
+// IMPORTANT!!! if you make a change to the tests here you should
+// make the same change to the tests under the AT DATA driver.
 
 // ----------------------------------------------------------------
 // COMPILE-TIME MACROS
@@ -21,7 +23,6 @@ using namespace utest::v1;
 // Note: for the JT M2M SIMs, each SIM is set up with a randomly
 // generated default PIN.  This is the PIN for the SIM with CCID
 // 8944501104169549834.
-//# define TEST_DEFAULT_PIN "0779"
 # define TEST_DEFAULT_PIN "9876"
 #endif
 #ifndef TEST_APN
@@ -36,7 +37,6 @@ using namespace utest::v1;
 
 // Alternate PIN to use during pin change testing
 #ifndef TEST_ALT_PIN
-//# define TEST_ALT_PIN    "9876"
 # define TEST_ALT_PIN    "0779"
 #endif
 
@@ -53,7 +53,7 @@ using namespace utest::v1;
 static Mutex mtx;
 
 // An instance of the cellular interface
-static UbloxCellularInterface *pInterface = new UbloxCellularInterface(true);
+static UbloxCellularInterfaceGeneric *pInterface = new UbloxCellularInterfaceGeneric(true);
 
 // Connection flag
 static bool connection_has_gone_down = false;
@@ -84,7 +84,7 @@ static void ppp_connection_down_cb(nsapi_error_t err)
 }
 
 // Do a thing over the connection, asserting if things go wrong
-static void do_ntp(UbloxCellularInterface *pInterface)
+static void do_ntp(UbloxCellularInterfaceGeneric *pInterface)
 {
     int ntp_values[12] = { 0 };
     time_t TIME1970 = 2208988800U;
@@ -131,7 +131,7 @@ static void do_ntp(UbloxCellularInterface *pInterface)
 }
 
 // Use a connection, checking that it is good
-static void use_connection(UbloxCellularInterface *pModem)
+static void use_connection(UbloxCellularInterfaceGeneric *pModem)
 {
     const char * ipAddress = pModem->get_ip_address();
     const char * netMask = pModem->get_netmask();
@@ -151,7 +151,7 @@ static void use_connection(UbloxCellularInterface *pModem)
 }
 
 // Drop a connection and check that it has dropped
-static void drop_connection(UbloxCellularInterface *pModem)
+static void drop_connection(UbloxCellularInterfaceGeneric *pModem)
 {
     TEST_ASSERT(pModem->disconnect() == 0);
     TEST_ASSERT(connection_has_gone_down);
@@ -176,7 +176,7 @@ void test_connect_credentials() {
 void test_connect_preset_credentials() {
 
     pInterface->deinit();
-    TEST_ASSERT(pInterface->init(TEST_DEFAULT_PIN) == 0);
+    TEST_ASSERT(pInterface->init(TEST_DEFAULT_PIN));
     pInterface->set_credentials(TEST_APN, TEST_USERNAME, TEST_PASSWORD);
     TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN) == 0);
     use_connection(pInterface);
@@ -221,7 +221,7 @@ void test_check_sim_pin_pending() {
     use_connection(pInterface);
     drop_connection(pInterface);
     pInterface->deinit();
-    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->init(NULL));
     TEST_ASSERT(pInterface->connect(TEST_INCORRECT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -243,7 +243,7 @@ void test_check_sim_pin_immediate() {
     pInterface->check_sim_pin(true, true, TEST_DEFAULT_PIN);
     pInterface->change_sim_pin(TEST_ALT_PIN, true);
     pInterface->deinit();
-    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->init(NULL));
     TEST_ASSERT(pInterface->connect(TEST_ALT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -254,7 +254,7 @@ void test_check_sim_pin_immediate() {
     pInterface->change_sim_pin(TEST_DEFAULT_PIN, true);
     pInterface->deinit();
     pInterface->set_SIM_pin(TEST_DEFAULT_PIN);
-    pInterface->init(NULL);
+    TEST_ASSERT(pInterface->init(NULL));
     TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -265,7 +265,7 @@ void test_check_sim_pin_immediate() {
     // longer matters what the PIN is
     pInterface->check_sim_pin(false, true);
     pInterface->deinit();
-    pInterface->init(TEST_INCORRECT_PIN);
+    TEST_ASSERT(pInterface->init(TEST_INCORRECT_PIN));
     TEST_ASSERT(pInterface->connect(NULL, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -280,9 +280,9 @@ void test_check_sim_pin_immediate() {
 // work afterwards, hence this must be run as the last test in the list
 void test_connect_local_instance_last_test() {
 
-    UbloxCellularInterface *pLocalInterface = NULL;
+    UbloxCellularInterfaceGeneric *pLocalInterface = NULL;
 
-    pLocalInterface = new UbloxCellularInterface(true);
+    pLocalInterface = new UbloxCellularInterfaceGeneric(true);
     pLocalInterface->connection_status_cb(ppp_connection_down_cb);
 
     TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
@@ -290,7 +290,7 @@ void test_connect_local_instance_last_test() {
     drop_connection(pLocalInterface);
     delete pLocalInterface;
 
-    pLocalInterface = new UbloxCellularInterface(true);
+    pLocalInterface = new UbloxCellularInterfaceGeneric(true);
     pLocalInterface->connection_status_cb(ppp_connection_down_cb);
 
     TEST_ASSERT(pLocalInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
@@ -310,6 +310,9 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
     return verbose_test_setup_handler(number_of_cases);
 }
 
+// IMPORTANT!!! if you make a change to the tests here you should
+// make the same change to the tests under the AT DATA driver.
+
 // Test cases
 Case cases[] = {
     Case("Connect with credentials", test_connect_credentials),
@@ -317,7 +320,6 @@ Case cases[] = {
     Case("Check SIM pin, pending", test_check_sim_pin_pending),
     Case("Check SIM pin, immediate", test_check_sim_pin_immediate),
     Case("Connect using local instance, must be last test", test_connect_local_instance_last_test)
-
 };
 
 Specification specification(test_setup, cases);

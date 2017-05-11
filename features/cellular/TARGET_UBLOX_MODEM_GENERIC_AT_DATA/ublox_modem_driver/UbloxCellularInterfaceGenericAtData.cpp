@@ -502,6 +502,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
 
     if (success) {
         nsapiErrorSize = cnt;
+        if ((cnt == 0) && (socket->timeoutMilliseconds != TIMEOUT_BLOCKING)) {
+            nsapiErrorSize = NSAPI_ERROR_WOULD_BLOCK;
+        }
     }
     tr_debug("socket_recv: %d \"%*s\"", cnt, cnt, buf - cnt);
 
@@ -586,6 +589,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
 
     if (success) {
         nsapiErrorSize = cnt;
+        if ((cnt == 0) && (socket->timeoutMilliseconds != TIMEOUT_BLOCKING)) {
+            nsapiErrorSize = NSAPI_ERROR_WOULD_BLOCK;
+        }
     }
     tr_debug("socket_recv: %d \"%*s\"", cnt, cnt, buf - cnt);
 

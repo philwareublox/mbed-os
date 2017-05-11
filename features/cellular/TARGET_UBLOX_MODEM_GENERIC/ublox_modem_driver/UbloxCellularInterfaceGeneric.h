@@ -32,7 +32,7 @@ class NetworkStack;
  *  This class implements the network stack interface into the cellular
  *  modems on the C030 and C027 boards for 2G/3G/4G modules.
  */
-class UbloxCellularInterfaceGeneric : virtual public UbloxCellularGenericBase, public CellularInterface {
+class UbloxCellularInterfaceGeneric : public CellularInterface, virtual public UbloxCellularGenericBase {
 
 public:
     UbloxCellularInterfaceGeneric(bool debug_on = false,

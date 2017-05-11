@@ -22,13 +22,24 @@
 #include "mbed_poll.h"
 #include "mbed_debug.h"
 
-#define _LF 10
-#define _CR 13
+#ifdef LF
+#undef LF
+#define LF  10
+#else
+#define LF  10
+#endif
+
+#ifdef CR
+#undef CR
+#define CR  13
+#else
+#define CR  13
+#endif
 
 // getc/putc handling with timeouts
 int ATParser::putc(char c)
 {
-    PollFH fhs;
+    pollfh fhs;
     fhs.fh = _fh;
     fhs.events = POLLOUT;
 
@@ -42,7 +53,7 @@ int ATParser::putc(char c)
 
 int ATParser::getc()
 {
-    PollFH fhs;
+    pollfh fhs;
     fhs.fh = _fh;
     fhs.events = POLLIN;
 
@@ -248,12 +259,12 @@ restart:
                 return false;
             }
             // Simplify newlines (borrowed from retarget.cpp)
-            if ((c == _CR && _in_prev != _LF) ||
-                (c == _LF && _in_prev != _CR)) {
+            if ((c == CR && _in_prev != LF) ||
+                (c == LF && _in_prev != CR)) {
                 _in_prev = c;
                 c = '\n';
-            } else if ((c == _CR && _in_prev == _LF) ||
-                       (c == _LF && _in_prev == _CR)) {
+            } else if ((c == CR && _in_prev == LF) ||
+                       (c == LF && _in_prev == CR)) {
                 _in_prev = c;
                 // onto next character
                 continue;

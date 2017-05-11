@@ -150,7 +150,7 @@ inline const char* apnconfig(const char* imsi)
     if (imsi && *imsi) {
         // many carriers use internet without username and password, os use this as default
         // now try to lookup the setting for our table
-        for (int i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
+        for (size_t i = 0; i < sizeof(apnlut)/sizeof(*apnlut) && !config; i ++) {
             const char* p = apnlut[i].mccmnc;
             // check the MCC
             if ((0 == memcmp(imsi, p, 3))) {

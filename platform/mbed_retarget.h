@@ -19,6 +19,9 @@
 #ifndef RETARGET_H
 #define RETARGET_H
 
+#if __cplusplus
+#include <cstdio>
+#endif //__cplusplus
 #include <stdint.h>
 #include <stddef.h>
 
@@ -48,7 +51,11 @@ typedef int mode_t;     ///< Mode for opening files
 
 /* DIR declarations must also be here */
 #if __cplusplus
-namespace mbed { class Dir; }
+namespace mbed {
+class Dir;
+class FileHandle;
+std::FILE *mbed_fdopen(FileHandle *fh, const char *mode);
+}
 typedef mbed::Dir DIR;
 #else
 typedef struct Dir DIR;
@@ -175,6 +182,5 @@ enum {
     DT_LNK,     // This is a symbolic link.
     DT_SOCK,    // This is a UNIX domain socket.
 };
-
 
 #endif /* RETARGET_H */

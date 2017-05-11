@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "FileHandle.h"
+#include "platform/mbed_retarget.h"
 #include "platform/mbed_critical.h"
 
 namespace mbed {
@@ -32,16 +33,9 @@ off_t FileHandle::size()
     return size;
 }
 
-void FileHandle::sigio(Callback<void()> func) {
-    core_util_critical_section_enter();
-    _callback = func;
-    if (_callback) {
-        short current_events = poll(0x7FFF);
-        if (current_events) {
-            _callback();
-        }
-    }
-    core_util_critical_section_exit();
+std::FILE *fdopen(FileHandle *fh, const char *mode)
+{
+    return mbed_fdopen(fh, mode);
 }
 
 } // namespace mbed

@@ -58,10 +58,10 @@
 static void ppp_connection_down_cb(nsapi_error_t err);
 static void (*callback_fptr)(nsapi_error_t);
 
-static bool initialized = false;
-static bool set_credentials_api_used = false;
-static bool set_sim_pin_check_request = false;
-static bool change_pin = false;
+static bool initialized;
+static bool set_credentials_api_used;
+static bool set_sim_pin_check_request;
+static bool change_pin;
 static device_info *dev_info;
 static modem_t mdm_object;
 
@@ -155,7 +155,7 @@ static void CMT_URC(ATParser *at)
 
 }
 
-static bool set_ATD(ATParser *at)
+static bool set_atd(ATParser *at)
 {
     bool success = at->send("ATD*99***"CTX"#") && at->recv("CONNECT");
 
@@ -255,6 +255,19 @@ static void set_nwk_reg_status_psd(unsigned int status)
     dev_info->reg_status_psd = static_cast<nwk_registration_status_psd>(status);
 }
 
+static bool is_registered_csd()
+{
+  return (dev_info->reg_status_csd == CSD_REGISTERED) ||
+          (dev_info->reg_status_csd == CSD_REGISTERED_ROAMING) ||
+          (dev_info->reg_status_csd == CSD_CSFB_NOT_PREFERRED);
+}
+
+static bool is_registered_psd()
+{
+    return (dev_info->reg_status_psd == PSD_REGISTERED) ||
+            (dev_info->reg_status_psd == PSD_REGISTERED_ROAMING);
+}
+
 ReferenceCellularInterface::ReferenceCellularInterface(bool debugOn, PinName tx, PinName rx, int baud)
 {
     _new_pin = NULL;
@@ -311,40 +324,37 @@ void ReferenceCellularInterface::change_sim_pin(const char *new_pin)
     _new_pin = new_pin;
 }
 
-bool ReferenceCellularInterface::nwk_registration()
+bool ReferenceCellularInterface::nwk_registration(uint8_t nwk_type)
 {
-    bool success = _at->send("AT+COPS=0") //initiate auto-registration
+    // Enable the packet switched/circuit switched network registration
+    return do_nwk_registration(nwk_type);
+}
+
+bool ReferenceCellularInterface::do_nwk_registration(uint8_t nwk_type)
+{
+    bool success = false;
+    bool registered = false;
+
+    char str[35];
+    int retcode;
+    int retry_counter = 0;
+    unsigned int reg_status;
+
+    success = nwk_type == PACKET_SWITCHED ?
+                    _at->send("AT+CGREG=0") :
+                    _at->send("AT+CREG=0") && _at->recv("OK\n");
+
+    success = _at->send("AT+COPS=0") //initiate auto-registration
                    && _at->recv("OK");
     if (!success) {
         tr_error("Modem not responding.");
         return false;
     }
-    // Enable the packet switched and network registration
-    if (!nwk_registration_status_csd()) {
-        tr_error("CSD connection failed.");
-        return false;
-    }
-    if (!nwk_registration_status_psd()) {
-        tr_error("PSD connection failed.");
-        return false;
-    }
-
-    return true;
-}
-
-bool ReferenceCellularInterface::nwk_registration_status_csd()
-{
-    bool success = false;
-
-    char str[35];
-    int retcode;
-    int retry_counter = 0;
-    unsigned int reg_status;
-    bool registered = false;
 
     //Network search
     //If not registered after 60 attempts, i.e., 30 seconds wait, give up
     tr_debug("Searching Network ...");
+
     while (!registered) {
 
         if (retry_counter > 60) {
@@ -352,81 +362,44 @@ bool ReferenceCellularInterface::nwk_registration_status_csd()
             goto give_up;
         }
 
-        success = _at->send("AT+CREG?")
-               && _at->recv("+CREG: %34[^\n]\n", str)
-               && _at->recv("OK\n");
+        success = nwk_type == PACKET_SWITCHED ?
+                        _at->send("AT+CGREG?")
+                        && _at->recv("+CGREG: %34[^\n]\n", str)
+                        && _at->recv("OK\n") :
+                        _at->send("AT+CREG?")
+                        && _at->recv("+CREG: %34[^\n]\n", str)
+                        && _at->recv("OK\n");
 
         retcode = sscanf(str, "%*u,%u", &reg_status);
 
-           if (retcode >= 1) {
-               set_nwk_reg_status_csd(reg_status);
-           }
-
-           if (dev_info->reg_status_csd == CSD_REGISTERED || dev_info->reg_status_csd == CSD_REGISTERED_ROAMING) {
-               registered = true;
-           } else if (dev_info->reg_status_csd == CSD_REGISTRATION_DENIED) {
-               success = false;
-               break;
-           } else {
-               wait_ms(500);
-           }
-
-           retry_counter++;
-    }
-
-give_up:
-    return success;
-}
-
-
-bool ReferenceCellularInterface::nwk_registration_status_psd()
-{
-
-    bool success = false;
-
-    char str[35];
-    int retcode;
-    int retry_counter = 0;
-    unsigned int reg_status;
-    bool registered = false;
-
-    //Data Network search
-    //If not registered after 60 attempts, i.e., 30 seconds wait, give up
-    tr_debug("Registering to data Network ...");
-    while (!registered) {
-
-        if (retry_counter > 60) {
-            success = false;
-            goto give_up;
+        if (retcode >= 1) {
+            if (nwk_type == PACKET_SWITCHED) {
+                set_nwk_reg_status_psd(reg_status);
+                if (is_registered_psd()) {
+                    registered = true;
+                }
+            } else if (nwk_type == CIRCUIT_SWITCHED) {
+                set_nwk_reg_status_csd(reg_status);
+                if (is_registered_csd()) {
+                    registered = true;
+                }
+            }
         }
 
-        success = _at->send("AT+CGREG?")
-               && _at->recv("+CGREG: %34[^\n]\n", str)
-               && _at->recv("OK\n");
+        if (registered) {
+            break;
+        } else {
+            wait_ms(500);
+        }
 
-        retcode = sscanf(str, "%*u,%u", &reg_status);
-
-           if (retcode >= 1) {
-               set_nwk_reg_status_psd(reg_status);
-           }
-
-           if (dev_info->reg_status_psd == PSD_REGISTERED || dev_info->reg_status_psd == PSD_REGISTERED_ROAMING) {
-               registered = true;
-           } else if (dev_info->reg_status_psd == PSD_REGISTRATION_DENIED) {
-               success = false;
-               break;
-           } else {
-               wait_ms(500);
-           }
-
-           retry_counter++;
+        retry_counter++;
     }
 
 give_up:
-    return success;
+    return registered;
 }
 
-bool ReferenceCellularInterface::isConnected()
+bool ReferenceCellularInterface::is_connected()
 {
     return dev_info->ppp_connection_up;
 }
@@ -469,7 +442,7 @@ nsapi_error_t ReferenceCellularInterface::initialize_sim_card()
     return nsapi_error;
 }
 
-void ReferenceCellularInterface::set_SIM_pin(const char *pin) {
+void ReferenceCellularInterface::set_sim_pin(const char *pin) {
     /* overwrite the default pin by user provided pin */
     _pin = pin;
 }
@@ -597,7 +570,7 @@ retry_init:
         serial->set_data_carrier_detect(NC);
 
 
-        if (!PowerUpModem()) {
+        if (!power_up_modem()) {
             return NSAPI_ERROR_DEVICE_ERROR;
         }
 
@@ -606,7 +579,7 @@ retry_init:
             return retcode;
         }
 
-        success =  nwk_registration() //perform network registration
+        success =  nwk_registration(PACKET_SWITCHED) //perform network registration
                 && get_CCID(_at) //get integrated circuit ID of the SIM
                 && get_IMSI(_at) //get international mobile subscriber information
                 && get_IMEI(_at) //get international mobile equipment identifier
@@ -672,9 +645,9 @@ retry_init:
     }
 
     /* Attempt to enter data mode */
-    success = set_ATD(_at); //enter into Data mode with the modem
+    success = set_atd(_at); //enter into Data mode with the modem
     if (!success) {
-        PowerDownModem();
+        power_down_modem();
         initialized = false;
 
         /* if we were previously initialized , i.e., not in this particular attempt,
@@ -747,7 +720,7 @@ const char *ReferenceCellularInterface::get_gateway()
 
 /** Power down modem
  *  Uses AT command to do it */
-void ReferenceCellularInterface::PowerDownModem()
+void ReferenceCellularInterface::power_down_modem()
 {
     modem_power_down(&mdm_object);
     modem_deinit(&mdm_object);
@@ -758,7 +731,7 @@ void ReferenceCellularInterface::PowerDownModem()
  *
  * Enables the GPIO lines to the modem and then wriggles the power line in short pulses.
  */
-bool ReferenceCellularInterface::PowerUpModem()
+bool ReferenceCellularInterface::power_up_modem()
 {
     /* Initialize GPIO lines */
     modem_init(&mdm_object);

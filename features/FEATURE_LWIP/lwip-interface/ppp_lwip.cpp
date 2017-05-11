@@ -95,7 +95,7 @@ static u32_t ppp_output(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx)
         return 0;
     }
 
-    PollFH fhs;
+    pollfh fhs;
     fhs.fh = stream;
     fhs.events = POLLOUT;
 
@@ -243,7 +243,7 @@ static void ppp_input()
     }
 
     // Non-blocking error check handler
-    PollFH fhs;
+    pollfh fhs;
     fhs.fh = my_stream;
     fhs.events = POLLIN;
     poll(&fhs, 1, 0);

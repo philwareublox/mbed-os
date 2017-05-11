@@ -16,12 +16,11 @@
 #ifndef MBED_POLL_H
 #define MBED_POLL_H
 
-#define POLLIN         0x0001
-#define POLLOUT        0x0010
-
-#define POLLERR        0x1000
-#define POLLHUP        0x2000
-#define POLLNVAL       0x4000
+#define POLLIN         0x0001 ///< Data may be read without blocking
+#define POLLOUT        0x0010 ///< Data may be written without blocking
+#define POLLERR        0x1000 ///< An error has occurred on the device or stream
+#define POLLHUP        0x2000 ///< The device has been disconnected
+#define POLLNVAL       0x4000 ///< The specified file handle value is invalid
 
 namespace mbed {
 
@@ -30,7 +29,7 @@ class FileHandle;
 /** \addtogroup platform */
 
 
-struct PollFH {
+struct pollfh {
     FileHandle *fh;
     short events;
     short revents;
@@ -48,11 +47,7 @@ struct PollFH {
  * @return 0 if timed out with nothing selected.
  * @return -1 for error.
  */
-int poll(PollFH fhs[], unsigned nfhs, int timeout);
-
-/** To be called by device when poll state changes - must be called for poll() and sigio() to work
- * @param fh    A pointer to the file handle*/
-void _poll_change(FileHandle *fh);
+int poll(pollfh fhs[], unsigned nfhs, int timeout);
 
 } // namespace mbed
 

@@ -23,7 +23,7 @@
 namespace mbed {
 
 // timeout -1 forever, or milliseconds
-int poll(PollFH fhs[], unsigned nfhs, int timeout)
+int poll(pollfh fhs[], unsigned nfhs, int timeout)
 {
     // Quick initial hack that spins
     Timer timer;
@@ -62,14 +62,6 @@ int poll(PollFH fhs[], unsigned nfhs, int timeout)
 #endif
     }
     return count;
-}
-
-void _poll_change(FileHandle *fh)
-{
-    // TODO, will depend on how we implement poll
-
-    // Also, do the user callback
-    fh->_send_sigio();
 }
 
 } // namespace mbed

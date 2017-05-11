@@ -121,6 +121,17 @@ static void init_serial() {
 #endif
 }
 
+/**
+ * Sets errno when file opening fails.
+ * Wipes out the filehandle too.
+ */
+static int handle_open_errors(int error, unsigned filehandle_idx) {
+    errno = -error;
+    // Free file handle
+    filehandles[filehandle_idx] = NULL;
+    return -1;
+}
+
 #if MBED_CONF_FILESYSTEM_PRESENT
 static inline int openmode_to_posix(int openmode) {
     int posix = openmode;
@@ -236,9 +247,6 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
     filehandles[fh_i] = (FileHandle*)FILE_HANDLE_RESERVED;
     filehandle_mutex->unlock();
 
-    /* if something goes wrong and we don't have a specific error, errno will be set to ENOENT */
-    int err = -ENOENT;
-
     FileHandle *res = NULL;
 
     /* FILENAME: ":0x12345678" describes a FileHandle* */
@@ -255,7 +263,7 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
             /* The first part of the filename (between first 2 '/') is not a
              * registered mount point in the namespace.
              */
-            goto fail;
+            return handle_open_errors(-ENOENT, fh_i);
         }
 
         if (path.isFile()) {
@@ -264,14 +272,14 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
         } else {
             FileSystem *fs = path.fileSystem();
             if (fs == NULL) {
-                goto fail;
+                return handle_open_errors(-ENOENT, fh_i);
             }
             int posix_mode = openmode_to_posix(openmode);
             File *file = new ManagedFile;
-            err = file->open(fs, path.fileName(), posix_mode);
+            int err = file->open(fs, path.fileName(), posix_mode);
             if (err < 0) {
                 delete file;
-                goto fail;
+                return handle_open_errors(err, fh_i);
             }
             res = file;
 #endif
@@ -281,12 +289,6 @@ extern "C" FILEHANDLE PREFIX(_open)(const char* name, int openmode) {
     filehandles[fh_i] = res;
 
     return fh_i + 3; // +3 as filehandles 0-2 are stdin/out/err
-
-fail:
-    errno = -err;
-    // Free file handle
-    filehandles[fh_i] = NULL;
-    return -1;
 }
 
 extern "C" int PREFIX(_close)(FILEHANDLE fh) {
@@ -944,7 +946,7 @@ int __wrap_atexit(void (*func)()) {
 
 namespace mbed {
 
-static void mbed_set_unbuffered_stream(std::FILE *_file) {
+void mbed_set_unbuffered_stream(std::FILE *_file) {
 #if defined (__ICCARM__)
     char buf[2];
     std::setvbuf(_file,buf,_IONBF,NULL);
@@ -953,7 +955,11 @@ static void mbed_set_unbuffered_stream(std::FILE *_file) {
 #endif
 }
 
-std::FILE *fdopen(FileHandle *fh, const char *mode)
+/* Applications are expected to use fdopen()
+ * not this function directly. This code had to live here because FILE and FileHandle
+ * processes are all linked together here.
+ */
+std::FILE *mbed_fdopen(FileHandle *fh, const char *mode)
 {
     char buf[12]; /* :0x12345678 + null byte */
     std::sprintf(buf, ":%p", fh);

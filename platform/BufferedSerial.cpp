@@ -19,9 +19,7 @@
 #include <errno.h>
 #include "platform/BufferedSerial.h"
 #include "platform/mbed_poll.h"
-#ifdef MBED_CONF_RTOS_PRESENT
-#include "rtos/rtos.h"
-#endif
+#include "platform/mbed_wait_api.h"
 
 namespace mbed {
 
@@ -42,7 +40,7 @@ BufferedSerial::~BufferedSerial()
 
 void BufferedSerial::DCD_IRQ()
 {
-    _poll_change(this);
+    wake();
 }
 
 void BufferedSerial::set_data_carrier_detect(PinName DCD_pin, bool active_high)
@@ -86,18 +84,26 @@ int BufferedSerial::sync()
 
     while (!_txbuf.empty()) {
         unlock();
-#ifdef MBED_CONF_RTOS_PRESENT
-        // Doing better than yield would require TxIRQ to also do poll_change when becoming empty. Worth it?
-        rtos::Thread::yield();
-#endif
-        // In non-RTOS environment, nothing else is waiting for processor's attention, so let it
-        //consume 100 percent resources. TODO proper wait, WFE or WFI
+        // Doing better than wait would require TxIRQ to also do wake() when becoming empty. Worth it?
+        wait_ms(1);
         lock();
     }
 
     unlock();
 
     return 0;
+}
+
+void BufferedSerial::sigio(Callback<void()> func) {
+    core_util_critical_section_enter();
+    _sigio_cb = func;
+    if (_sigio_cb) {
+        short current_events = poll(0x7FFF);
+        if (current_events) {
+            _sigio_cb();
+        }
+    }
+    core_util_critical_section_exit();
 }
 
 ssize_t BufferedSerial::write(const void* buffer, size_t length)
@@ -113,11 +119,7 @@ ssize_t BufferedSerial::write(const void* buffer, size_t length)
             return -EAGAIN;
         }
         unlock();
-#ifdef MBED_CONF_RTOS_PRESENT
-        rtos::Thread::yield(); // XXX todo - proper wait, WFE for non-rtos ?
-#endif
-        // In non-RTOS environment, nothing else is waiting for processor's attention, so let it
-        //consume 100 percent resources. TODO proper wait, WFE or WFI
+        wait_ms(1); // XXX todo - proper wait, WFE for non-rtos ?
         lock();
     }
 
@@ -155,9 +157,7 @@ ssize_t BufferedSerial::read(void* buffer, size_t length)
             return -EAGAIN;
         }
         unlock();
-#ifdef MBED_CONF_RTOS_PRESENT
-        rtos::Thread::yield(); // XXX todo - proper wait, WFE for non-rtos ?
-#endif
+        wait_ms(1);  // XXX todo - proper wait, WFE for non-rtos ?
         lock();
     }
 
@@ -174,6 +174,13 @@ ssize_t BufferedSerial::read(void* buffer, size_t length)
 bool BufferedSerial::hup() const
 {
     return _dcd && _dcd->read() != 0;
+}
+
+void BufferedSerial::wake()
+{
+    if (_sigio_cb) {
+        _sigio_cb();
+    }
 }
 
 short BufferedSerial::poll(short events) const {
@@ -225,7 +232,7 @@ void BufferedSerial::rx_irq(void)
 
     /* Report the File handler that data is ready to be read from the buffer. */
     if (was_empty && !_rxbuf.empty()) {
-        _poll_change(this);
+        wake();
     }
 }
 
@@ -249,7 +256,7 @@ void BufferedSerial::tx_irq(void)
 
     /* Report the File handler that data can be written to peripheral. */
     if (was_full && !_txbuf.full() && !hup()) {
-        _poll_change(this);
+        wake();
     }
 }
 

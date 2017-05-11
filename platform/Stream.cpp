@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include "platform/Stream.h"
+#include "platform/mbed_error.h"
+#include <errno.h>
 
 namespace mbed {
 
@@ -21,6 +23,14 @@ Stream::Stream(const char *name) : FileLike(name), _file(NULL) {
     // No lock needed in constructor
     /* open ourselves */
     _file = fdopen(this, "w+");
+    // fdopen() will make us buffered becuase Stream::isatty() 
+    // wrongly returns zero which is not being changed for
+    // backward compatibility 
+    if (_file) {
+        mbed_set_unbuffered_stream(_file);
+    } else {
+        error("Stream obj failure, errno=%d\r\n", errno);
+    }
 }
 
 Stream::~Stream() {
@@ -103,7 +113,7 @@ void Stream::rewind() {
 }
 
 int Stream::isatty() {
-    return 1;
+    return 0;
 }
 
 int Stream::sync() {

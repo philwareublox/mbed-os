@@ -121,6 +121,7 @@ public:
     *
     * @param timeout timeout of the connection
     */
+    MBED_DEPRECATED_SINCE("mbed-os-5.5.0", "Replaced with set_timeout for consistency")
     void setTimeout(int timeout) {
         set_timeout(timeout);
     }
@@ -144,6 +145,7 @@ public:
      *
      * @param delimiter string of characters to use as line delimiters
      */
+    MBED_DEPRECATED_SINCE("mbed-os-5.5.0", "Replaced with set_delimiter for consistency")
     void setDelimiter(const char *output_delimiter)
     {
         set_delimiter(output_delimiter);
@@ -165,6 +167,7 @@ public:
      *
      * @param echo 1 for echo and 0 turns it off
      */
+    MBED_DEPRECATED_SINCE("mbed-os-5.5.0", "Replaced with debug_on for consistency")
     void debugOn(uint8_t on) {
         debug_on(on);
     }
@@ -180,11 +183,8 @@ public:
     * @param ... all printf-like arguments to insert into command
     * @return true only if command is successfully sent
     */
-    bool send(const char *command, ...)
-#if defined(__GNUC__) || defined(__CC_ARM)
-    __attribute__ ((__format__(__printf__, 2, 3)))
-#endif
-    ;
+    bool send(const char *command, ...) MBED_PRINTF_METHOD(1,2);
+
     bool vsend(const char *command, va_list args);
 
     /**
@@ -201,11 +201,8 @@ public:
     * @param ... all scanf-like arguments to extract from response
     * @return true only if response is successfully matched
     */
-    bool recv(const char *response, ...)
-#if defined(__GNUC__) || defined(__CC_ARM)
-    __attribute__ ((__format__(__scanf__, 2, 3)))
-#endif
-    ;
+    bool recv(const char *response, ...) MBED_SCANF_METHOD(1,2);
+
     bool vrecv(const char *response, va_list args);
 
     /**
@@ -249,11 +246,8 @@ public:
     * @param ... arguments to printf
     * @return number of bytes written or -1 on failure
     */
-    int printf(const char *format, ...)
-#if defined(__GNUC__) || defined(__CC_ARM)
-    __attribute__ ((__format__(__printf__, 2, 3)))
-#endif
-    ;
+    int printf(const char *format, ...) MBED_PRINTF_METHOD(1,2);
+
     int vprintf(const char *format, va_list args);
 
     /**
@@ -264,11 +258,8 @@ public:
     * @param ... arguments to scanf
     * @return number of bytes read or -1 on failure
     */
-    int scanf(const char *format, ...)
-#if defined(__GNUC__) || defined(__CC_ARM)
-    __attribute__ ((__format__(__scanf__, 2, 3)))
-#endif
-    ;
+    int scanf(const char *format, ...) MBED_SCANF_METHOD(1,2);
+
     int vscanf(const char *format, va_list args);
 
     /**

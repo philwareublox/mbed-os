@@ -26,13 +26,14 @@ namespace mbed {
 /** \addtogroup platform */
 /** @{*/
 
+extern void mbed_set_unbuffered_stream(std::FILE *_file);
 extern int mbed_getc(std::FILE *_file);
 extern char* mbed_gets(char *s, int size, std::FILE *_file);
 /** @}*/
 
 /** File stream
  *
- * @Note Synchronization level: Set by subclass
+ * @note Synchronization level: Set by subclass
  * @ingroup platform
  */
 class Stream : public FileLike {

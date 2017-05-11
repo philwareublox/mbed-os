@@ -43,6 +43,15 @@ typedef enum {
 } radio_access_nwk_type;
 
 /**
+ * Used in registration process to tell which type of network
+ * to connect.
+ */
+typedef enum {
+    CIRCUIT_SWITCHED=0,
+    PACKET_SWITCHED
+} nwk_type;
+
+/**
  * Circuit Switched network registration status (CREG Usage)
  * UBX-13001820 - AT Commands Example Application Note (Section 7.10.3)
  */
@@ -110,11 +119,16 @@ public:
      *
      *  @param sim_pin      PIN for the SIM card
      */
-    virtual void  set_SIM_pin(const char *sim_pin);
+    virtual void set_sim_pin(const char *sim_pin);
 
     /** Start the interface
      *
      *  Attempts to connect to a Cellular network.
+     *  This driver is written mainly for data network connections as CellularInterface
+     *  is NetworkInterface. That's whu connect() call internaly calls nwk_registration()
+     *  method with parameter PACKET_SWITCHED network. Circuit switched hook and registration
+     *  process is implemented and left in the driver for future extension/subclass support,e.g.,
+     *  an SMS or GPS extension.
      *
      *  @param sim_pin     PIN for the SIM card
      *  @param apn         optionally, access point name
@@ -186,7 +200,7 @@ public:
      *                      connected to an external packet data network using PPP, isConnected()
      *                      API returns true and false otherwise.
      */
-    virtual bool isConnected();
+    virtual bool is_connected();
 
     /** Get the local IP address
      *
@@ -229,11 +243,9 @@ private:
     void shutdown_at_parser();
     nsapi_error_t initialize_sim_card();
     nsapi_error_t setup_context_and_credentials();
-    bool nwk_registration();
-    bool nwk_registration_status_csd();
-    bool nwk_registration_status_psd();
-    bool PowerUpModem();
-    void PowerDownModem();
+    bool do_nwk_registration(uint8_t nwk_type);
+    bool power_up_modem();
+    void power_down_modem();
 
 protected:
     /** Provide access to the underlying stack
@@ -241,6 +253,18 @@ protected:
      *  @return The underlying network stack
      */
     virtual NetworkStack *get_stack();
+
+    /** Starts network registration process.
+     *
+     * Potential users could be subclasses who are not network interface
+     * but would like to use CellularInterface infrastructure to register
+     * with a cellular network, e.g., an SMS extension to CellularInterface.
+     *
+     * @param nwk_type type of network to connect, defaults to packet switched network
+     *
+     * @return true if registration is successful
+     */
+    bool nwk_registration(uint8_t nwk_type=PACKET_SWITCHED);
 
 };
 

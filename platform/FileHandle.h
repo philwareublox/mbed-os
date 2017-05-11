@@ -137,7 +137,10 @@ public:
      *    -1 on failure or unsupported
      */
     MBED_DEPRECATED_SINCE("mbed-os-5.4", "Replaced by FileHandle::seek")
-    virtual off_t lseek(off_t offset, int whence) { return seek(offset, whence); }
+    virtual off_t lseek(off_t offset, int whence)
+    {
+        return seek(offset, whence);
+    }
 
     /** Flush any buffers associated with the FileHandle, ensuring it
      *  is up to date on disk
@@ -147,7 +150,10 @@ public:
      *   -1 on error
      */
     MBED_DEPRECATED_SINCE("mbed-os-5.4", "Replaced by FileHandle::sync")
-    virtual int fsync() { return sync(); }
+    virtual int fsync()
+    {
+        return sync();
+    }
 
     /** Find the length of the file
      *
@@ -155,7 +161,10 @@ public:
      *   Length of the file
      */
     MBED_DEPRECATED_SINCE("mbed-os-5.4", "Replaced by FileHandle::size")
-    virtual off_t flen() { return size(); }
+    virtual off_t flen()
+    {
+        return size();
+    }
 
     /** Set blocking or non-blocking mode of the file operation like read/write.
      *  Definition depends upon the subclass implementing FileHandle.
@@ -163,7 +172,8 @@ public:
      *
      *  @param blocking true for blocking mode, false for non-blocking mode.
      */
-    virtual int set_blocking(bool blocking) {
+    virtual int set_blocking(bool blocking)
+    {
         return -1;
     }
 
@@ -171,14 +181,19 @@ public:
      * The input parameter can be used or ignored - the could always return all events,
      * or could check just the events listed in events.
      * Call is non-blocking - returns instantaneous state of events.
-     * Whenever an event occurs, the derived class must call _poll_change().
+     * Whenever an event occurs, the derived class should call the sigio() callback).
+     *
      * @param events bitmask of poll events we're interested in - POLLIN/POLLOUT etc.
-     * @return bitmask of poll events that have occurred.
+     *
+     * @returns
+     *   bitmask of poll events that have occurred.
      */
-    virtual short poll(short events) const {
+    virtual short poll(short events) const
+    {
         // Possible default for real files
         return POLLIN | POLLOUT;
     }
+
     /** Returns true if the FileHandle is writable.
      *  Definition depends upon the subclass implementing FileHandle.
      *  For example, if the FileHandle is of type Stream, writable() could return
@@ -216,24 +231,17 @@ public:
      *
      *  @param func     Function to call on state change
      */
-    void sigio(Callback<void()> func);
-
-    /** Issue sigio to user - used by mbed::_poll_change */
-    void _send_sigio()
+    virtual void sigio(Callback<void()> func)
     {
-        if (_callback) {
-            _callback();
-        }
+        //Default for real files. Do nothing for real files.
     }
-
-private:
-    Callback<void()> _callback;
 };
 
 /** Not a member function
  *  This call is equivalent to posix fdopen().
- *  Returns a pointer to std::FILE
+ *  Returns a pointer to std::FILE.
  *  It associates a Stream to an already opened file descriptor (FileHandle)
+ *
  *  @param fh, a pointer to an opened file descriptor
  *  @param mode, operation upon the file descriptor, e.g., 'wb+'*/
 

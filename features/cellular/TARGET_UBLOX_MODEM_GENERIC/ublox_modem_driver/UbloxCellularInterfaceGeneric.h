@@ -13,121 +13,12 @@
  * limitations under the License.
  */
 
-#ifndef _UBLOX_CELLULAR_INTERFACE_
-#define _UBLOX_CELLULAR_INTERFACE_
+#ifndef _UBLOX_CELLULAR_INTERFACE_GENERIC_
+#define _UBLOX_CELLULAR_INTERFACE_GENERIC_
 
-#include "mbed.h"
 #include "nsapi.h"
-#include "rtos.h"
-#include "FileHandle.h"
 #include "InterruptIn.h"
-#include "ATParser.h"
-
-/**********************************************************************
- * MACROS
- **********************************************************************/
-
-/**
- *  Helper to make sure that lock unlock pair is always balanced
- */
-#define LOCK()         { lock()
-
-/**
- *  Helper to make sure that lock unlock pair is always balanced
- */
-#define UNLOCK()       } unlock()
-
-/**********************************************************************
- * TYPES
- **********************************************************************/
-
-/**
- * Supported u-blox modem variants
- */
-typedef enum {
-    DEV_TYPE_NONE=0,
-    DEV_SARA_G35,
-    DEV_LISA_U2,
-    DEV_LISA_U2_03S,
-    DEV_LISA_C2,
-    DEV_SARA_U2,
-    DEV_LEON_G2,
-    DEV_TOBY_L2,
-    DEV_MPCI_L2
-} device_type;
-
-/**
- * Network registration status
- * UBX-13001820 - AT Commands Example Application Note (Section 4.1.4.5)
- */
-typedef enum {
-   GSM=0,
-   COMPACT_GSM=1,
-   UTRAN=2,
-   EDGE=3,
-   HSDPA=4,
-   HSUPA=5,
-   HSDPA_HSUPA=6,
-   LTE=7
-} radio_access_nwk_type;
-
-/**
- * Circuit Switched network registration status (CREG Usage)
- * UBX-13001820 - AT Commands Example Application Note (Section 7.10.3)
- */
-typedef enum {
-    CSD_NOT_REGISTERED_NOT_SEARCHING=0,
-    CSD_REGISTERED=1,
-    CSD_NOT_REGISTERED_SEARCHING=2,
-    CSD_REGISTRATION_DENIED=3,
-    CSD_UNKNOWN_COVERAGE=4,
-    CSD_REGISTERED_ROAMING=5,
-    CSD_SMS_ONLY=6,
-    CSD_SMS_ONLY_ROAMING=7,
-    CSD_CSFB_NOT_PREFERRED=9
-} nwk_registration_status_csd;
-
-/**
- * Packet Switched network registration status (CGREG Usage)
- * UBX-13001820 - AT Commands Example Application Note (Section 18.27.3)
- */
-typedef enum {
-    PSD_NOT_REGISTERED_NOT_SEARCHING=0,
-    PSD_REGISTERED=1,
-    PSD_NOT_REGISTERED_SEARCHING=2,
-    PSD_REGISTRATION_DENIED=3,
-    PSD_UNKNOWN_COVERAGE=4,
-    PSD_REGISTERED_ROAMING=5,
-    PSD_EMERGENCY_SERVICES_ONLY=8
-} nwk_registration_status_psd;
-
-/**
- * EPS network registration status (CEREG Usage)
- * UBX-13001820 - AT Commands Example Application Note (Section 18.36.3)
- */
-typedef enum {
-    EPS_NOT_REGISTERED_NOT_SEARCHING=0,
-    EPS_REGISTERED=1,
-    EPS_NOT_REGISTERED_SEARCHING=2,
-    EPS_REGISTRATION_DENIED=3,
-    EPS_UNKNOWN_COVERAGE=4,
-    EPS_REGISTERED_ROAMING=5,
-    EPS_EMERGENCY_SERVICES_ONLY=8
-} nwk_registration_status_eps;
-
-typedef struct {
-    device_type dev;
-    char ccid[20+1];    //!< Integrated Circuit Card ID
-    char imsi[15+1];    //!< International Mobile Station Identity
-    char imei[15+1];    //!< International Mobile Equipment Identity
-    char meid[18+1];    //!< Mobile Equipment IDentifier
-    int flags;
-    bool ppp_connection_up;
-    radio_access_nwk_type rat;
-    nwk_registration_status_csd reg_status_csd;
-    nwk_registration_status_psd reg_status_psd;
-    nwk_registration_status_eps reg_status_eps;
-} device_info;
+#include "UbloxCellularGenericBase.h"
 
 /**********************************************************************
  * CLASSES
@@ -136,26 +27,19 @@ typedef struct {
 /* Forward declaration */
 class NetworkStack;
 
-/** UbloxCellularInterface class.
+/** UbloxCellularInterfaceGeneric class.
  *
- *  This interface serves as the controller/driver for the u-blox
- *  C030 and C027 boards.
+ *  This class implements the network stack interface into the cellular
+ *  modems on the C030 and C027 boards for 2G/3G/4G modules.
  */
-class UbloxCellularInterface : public CellularInterface {
+class UbloxCellularInterfaceGeneric : virtual public UbloxCellularGenericBase, public CellularInterface {
 
 public:
-    UbloxCellularInterface(bool debugOn = false, PinName tx = MDMTXD, PinName rx = MDMRXD, int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE);
-    ~UbloxCellularInterface();
-    /** Initialise the modem, ready for use.
-     *
-     *  @param sim_pin     PIN for the SIM card.
-     *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
-     */
-    virtual nsapi_error_t init(const char *sim_pin = 0);
-
-    /** Put the modem into its lowest power state.
-     */
-    virtual void deinit();
+    UbloxCellularInterfaceGeneric(bool debug_on = false,
+                                  PinName tx = MDMTXD,
+                                  PinName rx = MDMRXD,
+                                  int baud = MBED_CONF_UBLOX_MODEM_GENERIC_BAUD_RATE);
+    ~UbloxCellularInterfaceGeneric();
 
     /** Set the Cellular network credentials.
      *
@@ -172,7 +56,7 @@ public:
      *
      *  @param sim_pin      PIN for the SIM card.
      */
-    virtual void  set_SIM_pin(const char *sim_pin);
+    virtual void set_SIM_pin(const char *sim_pin);
 
     /** Connect to the cellular network and start the interface.
      *
@@ -181,7 +65,7 @@ public:
      *
      *  @param sim_pin     PIN for the SIM card.
      *  @param apn         optionally, access point name.
-     *  @param uname       optionally, Username.
+     *  @param uname       optionally, username.
      *  @param pwd         optionally, password.
      *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
      */
@@ -289,82 +173,41 @@ public:
      */
     void connection_status_cb(void (*fptr)(nsapi_error_t));
 
-private:
-    FileHandle *_fh;
-    const char *_pin;
-    const char *_apn;
-    const char *_uname;
-    const char *_pwd;
-    bool _debug_trace_on;
-    bool _modem_initialised;
-    bool _sim_pin_check_enabled;
-    bool _sim_pin_check_change_pending;
-    bool _sim_pin_check_change_pending_enabled_value;
-    bool _sim_pin_change_pending;
-    const char *_sim_pin_change_pending_new_pin_value;
-    void setup_at_parser();
-    void shutdown_at_parser();
-    bool set_device_identity(device_type *dev);
-    bool device_init(device_type dev);
-    nsapi_error_t initialise_sim_card();
-    nsapi_error_t setup_context_and_credentials();
-    bool nwk_registration(device_type dev);
-    bool nwk_registration_status(device_type dev);
-    bool power_up_modem();
-    void power_down_modem();
-    bool is_registered_csd();
-    bool is_registered_psd();
-    bool is_registered_eps();
-    void set_nwk_reg_status_csd(unsigned int status);
-    void set_nwk_reg_status_psd(unsigned int status);
-    void set_nwk_reg_status_eps(unsigned int status);
-    void set_RAT(unsigned int AcTStatus);
-    bool get_CCID();
-    bool get_IMSI();
-    bool get_IMEI();
-    bool get_MEID();
-    bool set_CMGF();
-    bool set_CNMI();
-    bool set_ATD();
-    void parser_abort();
-    nsapi_error_t do_check_sim_pin(bool check);
-    nsapi_error_t do_change_sim_pin(const char *new_pin);
-    void CMTI_URC();
-    void CMT_URC();
-
 protected:
 
-    /**
-     * Point to the instance of the AT parser in use.
+    /** The APN to use.
      */
-    ATParser *_at;
+    const char *_apn;
 
-    /**
-     * The mutex resource.
+    /** The user name to use.
      */
-    Mutex _mtx;
+    const char *_uname;
 
-    /**
-     * General info about the modem as a device.
+    /** The password to use.
      */
-    device_info *_dev_info;
+    const char *_pwd;
 
-    /**
-     * Lock a mutex when accessing the modem.
+    /** True if the PPP connection is active, otherwise false.
      */
-    virtual void lock(void)     { _mtx.lock(); }
+    bool _ppp_connection_up;
 
-    /**
-     * Unlock the modem when done accessing it.
-     */
-    virtual void unlock(void)   { _mtx.unlock(); }
-
-    /**
-     * Provide access to the underlying stack.
+    /** Provide access to the underlying stack.
      *
      * @return The underlying network stack.
      */
     virtual NetworkStack *get_stack();
+
+    /** Get the next set of credentials from the database.
+     */
+    void get_next_credentials(const char * config);
+
+private:
+    bool _sim_pin_check_change_pending;
+    bool _sim_pin_check_change_pending_enabled_value;
+    bool _sim_pin_change_pending;
+    const char *_sim_pin_change_pending_new_pin_value;
+    nsapi_error_t setup_context_and_credentials();
+    bool set_atd();
 };
 
-#endif //_UBLOX_CELLULAR_INTERFACE_
+#endif //_UBLOX_CELLULAR_INTERFACE_GENERIC_

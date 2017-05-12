@@ -270,7 +270,7 @@ protected:
     typedef struct {
         int modemHandle;
         int timeoutMilliseconds;
-        volatile bool connected;
+        volatile bool tcpConnected;
         volatile nsapi_size_t pending;
     } SockCtrl;
 

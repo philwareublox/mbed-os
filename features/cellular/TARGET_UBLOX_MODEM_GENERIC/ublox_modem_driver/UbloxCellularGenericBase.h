@@ -274,8 +274,6 @@ protected:
 
 private:
 
-    void setup_at_parser();
-    void shutdown_at_parser();
     void set_nwk_reg_status_csd(unsigned int status);
     void set_nwk_reg_status_psd(unsigned int status);
     void set_nwk_reg_status_eps(unsigned int status);

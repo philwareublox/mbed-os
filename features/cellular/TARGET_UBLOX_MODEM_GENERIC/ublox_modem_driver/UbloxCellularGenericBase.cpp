@@ -55,28 +55,6 @@ static modem_t mdm_object;
  * PRIVATE METHODS
  **********************************************************************/
 
-// Start an instance of the AT parser.
-void UbloxCellularGenericBase::setup_at_parser()
-{
-    if (_at == NULL) {
-        _at = new ATParser(_fh, OUTPUT_ENTER_KEY, AT_PARSER_BUFFER_SIZE,
-                           AT_PARSER_TIMEOUT,
-                           _debug_trace_on ? true : false);
-
-        // Error cases, out of band handling
-        _at->oob("ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
-        _at->oob("+CME ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
-        _at->oob("+CMS ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
-    }
-}
-
-// Free the AT parser.
-void UbloxCellularGenericBase::shutdown_at_parser()
-{
-    delete _at;
-    _at = NULL;
-}
-
 void UbloxCellularGenericBase::set_nwk_reg_status_csd(unsigned int status)
 {
     switch (status) {
@@ -534,6 +512,16 @@ UbloxCellularGenericBase::UbloxCellularGenericBase(bool debug_on, PinName tx,
     _dev_info->reg_status_csd = CSD_NOT_REGISTERED_NOT_SEARCHING;
     _dev_info->reg_status_psd = PSD_NOT_REGISTERED_NOT_SEARCHING;
     _dev_info->reg_status_eps = EPS_NOT_REGISTERED_NOT_SEARCHING;
+
+    // Set up the AT parser
+    _at = new ATParser(_fh, OUTPUT_ENTER_KEY, AT_PARSER_BUFFER_SIZE,
+                       AT_PARSER_TIMEOUT,
+                       _debug_trace_on ? true : false);
+
+    // Error cases, out of band handling
+    _at->oob("ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
+    _at->oob("+CME ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
+    _at->oob("+CMS ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
 }
 
 // Destructor.
@@ -550,8 +538,6 @@ bool UbloxCellularGenericBase::init(const char *pin)
     LOCK();
 
     if (!_modem_initialised) {
-        // Setup AT parser
-        setup_at_parser();
         if (power_up_modem()) {
             if (pin != NULL) {
                 _pin = pin;
@@ -579,7 +565,9 @@ bool UbloxCellularGenericBase::init(const char *pin)
 void UbloxCellularGenericBase::deinit()
 {
     power_down_modem();
-    shutdown_at_parser();
+
+    delete _at;
+    _at = NULL;
 
     _modem_initialised = false;
 }

@@ -20,7 +20,7 @@
 #include "APN_db.h"
 #if defined(FEATURE_COMMON_PAL)
 #include "mbed_trace.h"
-#define TRACE_GROUP "UCID"
+#define TRACE_GROUP "UCGD"
 #else
 #define tr_debug(...) (void(0)) // dummies if feature common pal is not added
 #define tr_info(...)  (void(0)) // dummies if feature common pal is not added
@@ -251,10 +251,8 @@ nsapi_error_t UbloxCellularInterfaceGeneric::connect()
             } while (!_ppp_connection_up && config && *config);
         }
 
-        // If we were unable to connect, power down the modem
         if (!_ppp_connection_up) {
-            tr_error("Failed to connect, check your APN/Username/Password");
-            power_down_modem();
+            tr_error("Failed to connect, check your APN/username/password");
         }
     }
 

@@ -78,6 +78,8 @@ public:
      *  network and then brings up the underlying network stack to be used
      *  by the cellular modem over PPP interface.  Note: if init() has
      *  not been called beforehand, connect() will call it first.
+     *  NOTE: even a failed attempt to connect will cause the modem to remain
+     *  powered up.  To power it down, call deinit().
      *
      *  For APN setup, default behaviour is to use 'internet' as APN string and assuming no authentication
      *  is required, i.e., username and password are not set. Optionally, a database lookup can be requested

@@ -41,6 +41,8 @@
  *  The disadvantage is that some additional parsing
  *  (at the AT interface) has to go on in order to exchange
  *  IP packets, so this is less efficient under heavy loads.
+ *  TCP Server and setting/getting of socket options is
+ *  currently not supported.
  */
 
 // Forward declaration
@@ -80,7 +82,7 @@ public:
 
     /** Set the authentication scheme.
      *
-     *  @param auth      the authentication scheme, chose from
+     *  @param auth      The authentication scheme, chose from
      *                   NSAPI_SECURITY_NONE, NSAPI_SECURITY_PAP,
      *                   NSAPI_SECURITY_CHAP or NSAPI_SECURITY_UNKNOWN;
      *                   use NSAPI_SECURITY_UNKNOWN to try all of none,
@@ -93,8 +95,8 @@ public:
      *  Please check documentation of connect() for default behaviour of APN settings.
      *
      *  @param apn      Access point name.
-     *  @param uname    optionally, username.
-     *  @param pwd      optionally, password.
+     *  @param uname    Optionally, user name.
+     *  @param pwd      Optionally, password.
      */
     virtual void set_credentials(const char *apn, const char *uname = 0,
                                  const char *pwd = 0);
@@ -111,9 +113,9 @@ public:
      *  not been called beforehand, connect() will call it first.
      *
      *  @param sim_pin     PIN for the SIM card.
-     *  @param apn         optionally, access point name.
-     *  @param uname       optionally, Username.
-     *  @param pwd         optionally, password.
+     *  @param apn         Optionally, access point name.
+     *  @param uname       Optionally, Username.
+     *  @param pwd         Optionally, password.
      *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
      */
     virtual nsapi_error_t connect(const char *sim_pin, const char *apn = 0,
@@ -125,6 +127,8 @@ public:
      *  network and then brings up IP stack on the cellular modem to be used
      *  indirectly via AT commands, rather than LWIP.  Note: if init() has
      *  not been called beforehand, connect() will call it first.
+     *  NOTE: even a failed attempt to connect will cause the modem to remain
+     *  powered up.  To power it down, call deinit().
      *
      *  For APN setup, default behaviour is to use 'internet' as APN string and assuming no authentication
      *  is required, i.e., username and password are not set. Optionally, a database lookup can be requested
@@ -137,7 +141,7 @@ public:
      *  If you find that the AT interface returns "CONNECT" but shortly afterwards drops the connection
      *  then 99% of the time this will be because the APN is incorrect.
      *
-     *  @return         0 on success, negative error code on failure.
+     *  @return            0 on success, negative error code on failure.
      */
     virtual nsapi_error_t connect();
 
@@ -146,7 +150,7 @@ public:
      *  Brings down the network interface.
      *  Does not bring down the Radio network.
      *
-     *  @return         0 on success, negative error code on failure.
+     *  @return            0 on success, negative error code on failure.
      */
     virtual nsapi_error_t disconnect();
 
@@ -154,13 +158,13 @@ public:
      *
      * Can be used to enable or disable SIM PIN check at device startup.
      *
-     * @param check        can be set to true if the SIM PIN check is supposed
+     * @param check        Can be set to true if the SIM PIN check is supposed
      *                     to be enabled and vice versa.
-     * @param immediate    if true, change the SIM PIN now, else set a flag
+     * @param immediate    If true, change the SIM PIN now, else set a flag
      *                     and make the change only when connect() is called.
      *                     If this is true and init() has not been called previously,
      *                     it will be called first.
-     * @param sim_pin      the current SIM PIN, must be a const.  If this is not
+     * @param sim_pin      The current SIM PIN, must be a const.  If this is not
      *                     provided, the SIM PIN must have previously been set by a
      *                     call to set_SIM_pin().
      * @return             0 on success, negative error code on failure.
@@ -173,23 +177,21 @@ public:
      * Provide the new PIN for your SIM card with this API.  It is ONLY possible to
      * change the SIM PIN when SIM PIN checking is ENABLED.
      *
-     * @param new_pin     new PIN to be used in string format, must be a const.
-     * @param immediate   if true, change the SIM PIN now, else set a flag
-     *                    and make the change only when connect() is called.
-     *                    If this is true and init() has not been called previously,
-     *                    it will be called first.
-     * @param old_pin     old PIN, must be a const.  If this is not provided, the SIM PIN
-     *                    must have previously been set by a call to set_SIM_pin().
-     * @return            0 on success, negative error code on failure.
+     * @param new_pin    New PIN to be used in string format, must be a const.
+     * @param immediate  If true, change the SIM PIN now, else set a flag
+     *                   and make the change only when connect() is called.
+     *                   If this is true and init() has not been called previously,
+     *                   it will be called first.
+     * @param old_pin    Old PIN, must be a const.  If this is not provided, the SIM PIN
+     *                   must have previously been set by a call to set_SIM_pin().
+     * @return           0 on success, negative error code on failure.
      */
     nsapi_error_t change_sim_pin(const char *new_pin, bool immediate = false,
                                  const char *old_pin = NULL);
 
     /** Check if the connection is currently established or not.
      *
-     * @return true/false   If the cellular module have successfully acquired a carrier and is
-     *                      connected to an external packet data network using PPP, isConnected()
-     *                      API returns true and false otherwise.
+     * @return          True if connected to a data network, otherwise false.
      */
     virtual bool is_connected();
 
@@ -219,7 +221,7 @@ public:
      *  set_blocking(false) is equivalent to set_timeout(-1).
      *  set_blocking(true) is equivalent to set_timeout(0).
      *
-     *  @param blocking true for blocking mode, false for non-blocking mode.
+     *  @param blocking True for blocking mode, false for non-blocking mode.
      *  @return         0 on success, negative error code on failure
      */
     virtual nsapi_error_t set_blocking(nsapi_socket_t handle, bool blocking);
@@ -243,7 +245,7 @@ public:
 
     /** Call back in case connection is lost.
      *
-     * @param fptr     the function to call.
+     * @param fptr     The function to call.
      */
     void connection_status_cb(void (*fptr)(nsapi_error_t));
 
@@ -256,14 +258,6 @@ protected:
     /** Socket "unused" value
      */
     #define SOCKET_UNUSED - 1
-
-    /** Maximum number of bytes that can be written to a socket.
-     */
-    #define MAX_WRITE_SIZE 1024
-
-    /** Maximum number of bytes that can be read from a socket.
-     */
-    #define MAX_READ_SIZE 128
 
     /** Management structure for sockets.
      */
@@ -373,13 +367,15 @@ protected:
      */
     virtual nsapi_error_t socket_close(nsapi_socket_t handle);
 
-    /** Bind a specific address to a socket.
+    /** Bind a specific port to a socket.
      *
-     *  Binding a socket specifies the address and port on which to receive
-     *  data. If the IP address is zeroed, only the port is bound.
+     *  Binding a socket specifies port on which to receive
+     *  data. The IP address is ignored.  Note that binding
+     *  a socket involves closing it and reopening and so the
+     *  bind operation should be carried out before any others.
      *
-     *  @param handle   Socket handle
-     *  @param address  Local address to bind
+     *  @param handle   Socket handle.
+     *  @param address  Local address to bind (of which only the port is used).
      *  @return         0 on success, negative error code on failure.
      */
     virtual nsapi_error_t socket_bind(nsapi_socket_t handle, const SocketAddress &address);
@@ -389,9 +385,9 @@ protected:
      *  Initiates a connection to a remote server specified by the
      *  indicated address.
      *
-     *  @param handle   Socket handle
-     *  @param address  The SocketAddress of the remote host
-     *  @return         0 on success, negative error code on failure
+     *  @param handle   Socket handle.
+     *  @param address  The SocketAddress of the remote host.
+     *  @return         0 on success, negative error code on failure.
      */
     virtual nsapi_error_t socket_connect(nsapi_socket_t handle, const SocketAddress &address);
 
@@ -545,10 +541,12 @@ private:
     bool _sim_pin_change_pending;
     const char *_sim_pin_change_pending_new_pin_value;
     SockCtrl * findSocket(int modemHandle = SOCKET_UNUSED);
+    void clearSocket(SockCtrl * socket);
     int nsapiSecurityToModemSecurity(nsapi_security_t nsapiSecurity);
     void UUSORD_URC();
     void UUSORF_URC();
     void UUSOCL_URC();
+    void UUPSDD_URC();
 };
 
 #endif // _UBLOX_CELLULAR_INTERFACE_GENERIC_AT_DATA_

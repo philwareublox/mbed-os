@@ -166,7 +166,6 @@ static void drop_connection(UbloxCellularInterfaceGeneric *pModem)
 // Connect with credentials included in the connect request
 void test_connect_credentials() {
 
-    pInterface->deinit();
     TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);

@@ -141,7 +141,7 @@ static void use_connection(UbloxCellularInterfaceGenericAtData *pModem)
 
     TEST_ASSERT(ipAddress != NULL);
     tr_debug ("IP address %s.", ipAddress);
-    TEST_ASSERT(netMask != NULL);
+    TEST_ASSERT(netMask == NULL);
     tr_debug ("Net mask %s.", netMask);
     TEST_ASSERT(gateway != NULL);
     tr_debug ("Gateway %s.", gateway);
@@ -166,7 +166,6 @@ static void drop_connection(UbloxCellularInterfaceGenericAtData *pModem)
 // Connect with credentials included in the connect request
 void test_connect_credentials() {
 
-    pInterface->deinit();
     TEST_ASSERT(pInterface->connect(TEST_DEFAULT_PIN, TEST_APN, TEST_USERNAME, TEST_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -336,7 +335,7 @@ int main() {
     mbed_trace_mutex_release_function_set(unlock);
 
     pInterface->connection_status_cb(ppp_connection_down_cb);
-    
+
     // Run tests
     return !Harness::run(specification);
 }

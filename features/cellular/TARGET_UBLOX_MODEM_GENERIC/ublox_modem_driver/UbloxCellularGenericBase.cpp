@@ -19,29 +19,12 @@
 #include "APN_db.h"
 #if defined(FEATURE_COMMON_PAL)
 #include "mbed_trace.h"
-#define TRACE_GROUP "UCID"
+
+#define TRACE_GROUP "UCBD"
 #else
 #define tr_debug(...) (void(0)) // dummies if feature common pal is not added
 #define tr_info(...)  (void(0)) // dummies if feature common pal is not added
 #define tr_error(...) (void(0)) // dummies if feature common pal is not added
-#endif
-
-/**********************************************************************
- * MACROS
- **********************************************************************/
-
-#define OUTPUT_ENTER_KEY  "\r"
-
-#if MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_BUFFER_SIZE
-#define AT_PARSER_BUFFER_SIZE   MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_BUFFER_SIZE
-#else
-#define AT_PARSER_BUFFER_SIZE   256
-#endif
-
-#if MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_TIMEOUT
-#define AT_PARSER_TIMEOUT       MBED_CONF_UBLOX_CELL_GEN_DRV_AT_PARSER_TIMEOUT
-#else
-#define AT_PARSER_TIMEOUT       8*1000 // Milliseconds
 #endif
 
 /**********************************************************************
@@ -55,7 +38,7 @@ static modem_t mdm_object;
  * PRIVATE METHODS
  **********************************************************************/
 
-void UbloxCellularGenericBase::set_nwk_reg_status_csd(unsigned int status)
+void UbloxCellularGenericBase::set_nwk_reg_status_csd(int status)
 {
     switch (status) {
         case CSD_NOT_REGISTERED_NOT_SEARCHING:
@@ -82,14 +65,14 @@ void UbloxCellularGenericBase::set_nwk_reg_status_csd(unsigned int status)
             tr_debug("Registered for circuit switched service with CSFB not preferred");
             break;
         default:
-            tr_debug("Unknown circuit switched service registration status. %u", status);
+            tr_debug("Unknown circuit switched service registration status. %d", status);
             break;
     }
 
     _dev_info->reg_status_csd = static_cast<nwk_registration_status_csd>(status);
 }
 
-void UbloxCellularGenericBase::set_nwk_reg_status_psd(unsigned int status)
+void UbloxCellularGenericBase::set_nwk_reg_status_psd(int status)
 {
     switch (status) {
         case PSD_NOT_REGISTERED_NOT_SEARCHING:
@@ -110,14 +93,14 @@ void UbloxCellularGenericBase::set_nwk_reg_status_psd(unsigned int status)
             tr_debug("Limited access for packet switched service. Emergency use only.");
             break;
         default:
-            tr_debug("Unknown packet switched service registration status. %u", status);
+            tr_debug("Unknown packet switched service registration status. %d", status);
             break;
     }
 
     _dev_info->reg_status_psd = static_cast<nwk_registration_status_psd>(status);
 }
 
-void UbloxCellularGenericBase::set_nwk_reg_status_eps(unsigned int status)
+void UbloxCellularGenericBase::set_nwk_reg_status_eps(int status)
 {
     switch (status) {
         case EPS_NOT_REGISTERED_NOT_SEARCHING:
@@ -138,40 +121,40 @@ void UbloxCellularGenericBase::set_nwk_reg_status_eps(unsigned int status)
             tr_debug("Limited access for EPS service. Emergency use only.");
             break;
         default:
-            tr_debug("Unknown EPS service registration status. %u", status);
+            tr_debug("Unknown EPS service registration status. %d", status);
             break;
     }
 
     _dev_info->reg_status_eps = static_cast<nwk_registration_status_eps>(status);
 }
 
-void UbloxCellularGenericBase::set_rat(unsigned int AcTStatus)
+void UbloxCellularGenericBase::set_rat(int AcTStatus)
 {
     switch (AcTStatus) {
         case GSM:
         case COMPACT_GSM:
-            tr_debug("Connected to RAT. GSM");
+            tr_debug("Connected in GSM");
             break;
         case UTRAN:
-            tr_debug("Connected to RAT. UTRAN");
+            tr_debug("Connected to UTRAN");
             break;
         case EDGE:
-            tr_debug("Connected to RAT. EDGE");
+            tr_debug("Connected to EDGE");
             break;
         case HSDPA:
-            tr_debug("Connected to RAT. HSDPA");
+            tr_debug("Connected to HSDPA");
             break;
         case HSUPA:
-            tr_debug("Connected to RAT. HSPA");
+            tr_debug("Connected to HSPA");
             break;
         case HSDPA_HSUPA:
-            tr_debug("Connected to RAT. HDPA/HSPA");
+            tr_debug("Connected to HDPA/HSPA");
             break;
         case LTE:
-            tr_debug("Connected to RAT. LTE");
+            tr_debug("Connected to LTE");
             break;
         default:
-            tr_debug("Unknown RAT. %u", AcTStatus);
+            tr_debug("Unknown RAT %d", AcTStatus);
             break;
     }
 
@@ -240,6 +223,84 @@ void UbloxCellularGenericBase::parser_abort_cb()
     _at->abort();
 }
 
+// Callback for CME ERROR and CMS ERROR.
+void UbloxCellularGenericBase::CMX_ERROR_URC()
+{
+    char description[48];
+
+    memset (description, 0, sizeof (description)); // Ensure terminator
+    if (_at->recv(": %48[^\n]\n", description)) {
+        tr_debug("AT error \"%.*s\"", sizeof (description), description);
+    }
+    parser_abort_cb();
+}
+
+// Callback for circuit switched registration URC.
+void UbloxCellularGenericBase::CREG_URC()
+{
+    char string[10];
+    int status;
+
+    // If this is the URC it will be a single
+    // digit followed by \n.  If it is the
+    // answer to a CREG query, it will be
+    // a "%d,%d\n" where the second digit
+    // indicates the status
+    if (_at->recv(": %10[^\n]\n", string)) {
+        if (sscanf(string, "%*d,%d", &status) == 1) {
+            set_nwk_reg_status_csd(status);
+        } else if (sscanf(string, "%d", &status) == 1) {
+            set_nwk_reg_status_csd(status);
+        }
+    }
+}
+
+// Callback for packet switched registration URC.
+void UbloxCellularGenericBase::CGREG_URC()
+{
+    char string[10];
+    int status;
+
+    // If this is the URC it will be a single
+    // digit followed by \n.  If it is the
+    // answer to a CGREG query, it will be
+    // a "%d,%d\n" where the second digit
+    // indicates the status
+    if (_at->recv(": %10[^\n]\n", string)) {
+        if (sscanf(string, "%*d,%d", &status) == 1) {
+            set_nwk_reg_status_psd(status);
+        } else if (sscanf(string, "%d", &status) == 1) {
+            set_nwk_reg_status_psd(status);
+        }
+    }
+}
+
+// Callback for EPS registration URC.
+void UbloxCellularGenericBase::CEREG_URC()
+{
+    char string[10];
+    int status;
+
+    // If this is the URC it will be a single
+    // digit followed by \n.  If it is the
+    // answer to a CEREG query, it will be
+    // a "%d,%d\n" where the second digit
+    // indicates the status
+    if (_at->recv(": %10[^\n]\n", string)) {
+        if (sscanf(string, "%*d,%d", &status) == 1) {
+            set_nwk_reg_status_eps(status);
+        } else if (sscanf(string, "%d", &status) == 1) {
+            set_nwk_reg_status_eps(status);
+        }
+    }
+}
+
+// Callback UMWI, just filtering it out.
+void UbloxCellularGenericBase::UMWI_URC()
+{
+    _at->recv(": %*d,%*d\n");
+}
+
 /**********************************************************************
  * PROTECTED METHODS
  **********************************************************************/
@@ -269,7 +330,7 @@ bool UbloxCellularGenericBase::power_up_modem()
         }
     }
 
-    _at->set_timeout(8000);
+    _at->set_timeout(AT_PARSER_TIMEOUT);
 
     if (success) {
         success = _at->send("ATE0;" // Turn off modem echoing
@@ -294,8 +355,8 @@ void UbloxCellularGenericBase::power_down_modem()
 {
     LOCK();
 
-    // If possible, do a soft power-off first
-    if (_at) {
+    // If we have been running, do a soft power-off first
+    if (_modem_initialised && (_at != NULL)) {
         _at->send("AT+CPWROFF") && _at->recv("OK");
     }
 
@@ -303,79 +364,67 @@ void UbloxCellularGenericBase::power_down_modem()
     modem_power_down(&mdm_object);
     modem_deinit(&mdm_object);
 
-    UNLOCK();
+    _dev_info->reg_status_csd = CSD_NOT_REGISTERED_NOT_SEARCHING;
+    _dev_info->reg_status_psd = PSD_NOT_REGISTERED_NOT_SEARCHING;
+    _dev_info->reg_status_eps = EPS_NOT_REGISTERED_NOT_SEARCHING;
+
+   UNLOCK();
 }
 
 // Perform registration.
 bool UbloxCellularGenericBase::nwk_registration(device_type dev)
 {
+    bool atSuccess = false;
     bool registered = false;
+    int status;
     LOCK();
 
     // Enable the packet switched and network registration unsolicited result codes
-    if (_at->send("AT+CGREG=0;+CREG=0") && _at->recv("OK")) {
-        // For Operator selection, we should have a longer timeout.
-        // According to Ublox AT Manual UBX-13002752, it could be 3 minutes
-        for (int waitSeconds = 0; !registered && (waitSeconds < 180); waitSeconds++) {
-            if (nwk_registration_status(dev)) {
-                registered = is_registered_psd() || is_registered_csd() || is_registered_eps();
+    if (_at->send("AT+CREG=1") && _at->recv("OK") &&
+        _at->send("AT+CGREG=1") && _at->recv("OK")) {
+        if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
+            if (_at->send("AT+CEREG=1") && _at->recv("OK")) {
+                atSuccess = true;
             }
-            wait_ms (1000);
+        } else {
+            atSuccess = true;
         }
+
+        if (atSuccess) {
+            // In case this is a new instance of the driver while the
+            // modem underneath has not been power cycled to cause the
+            // registration status to change and trigger a URC,
+            // query the registration status directly as well
+            if (_at->send("AT+CREG?") && _at->recv("OK")) {
+                // Answer will be processed by URC
+            }
+            if (_at->send("AT+CGREG?") && _at->recv("OK")) {
+                // Answer will be processed by URC
+            }
+            if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
+                if (_at->send("AT+CEREG?") && _at->recv("OK")) {
+                    // Answer will be processed by URC
+                }
+            }
+
+            // Now wait for registration to succeed
+            _at->set_timeout(1000);
+            for (int waitSeconds = 0; !registered && (waitSeconds < 180); waitSeconds++) {
+                registered = is_registered_psd() || is_registered_csd() || is_registered_eps();
+                _at->recv(UNNATURAL_STRING);
+            }
+            _at->set_timeout(AT_PARSER_TIMEOUT);
+        }
+    }
+
+    if (registered) {
+       if (_at->send("AT+COPS?") && _at->recv("+COPS: %*d,%*d,\"%*[^\"]\",%d", &status)) {
+            set_rat(status);
+       }
     }
 
     UNLOCK();
     return registered;
-}
-
-// Check for both circuit switched and packet switched registration status,
-// returning true if we are able to update the status variables.
-bool UbloxCellularGenericBase::nwk_registration_status(device_type dev)
-{
-    int successCount = 0;
-    char str[35];
-    unsigned int status;
-    LOCK();
-
-    // URC's have been disabled by choice, so we are expecting
-    // +CREG/+CGREG/+CEREG: <n>,<stat> where n will always be zero and stat is
-    // the registration status for circuit switched, packet switched and EPS
-    // service respectively.
-    if (_at->send("AT+CREG?") && _at->recv("+CREG: %34[^\n]\n", str)) {
-        if (sscanf(str, "%*u,%u", &status) >= 1) {
-            set_nwk_reg_status_csd(status);
-            successCount++;
-        }
-    }
-
-    if (_at->send("AT+CGREG?") && _at->recv("+CGREG: %34[^\n]\n", str)) {
-        if (sscanf(str, "%*u,%u", &status) >= 1) {
-            set_nwk_reg_status_psd(status);
-            successCount++;
-        }
-    }
-
-    if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
-        if (_at->send("AT+CEREG?") && _at->recv("+CEREG: %34[^\n]\n", str)) {
-            if (sscanf(str, "%*u,%u", &status) >= 1) {
-                set_nwk_reg_status_eps(status);
-                successCount++;
-            }
-        }
-    } else {
-        successCount++;
-    }
-
-    /* Determine the  type from AT+COPS, if possible */
-    if ((is_registered_csd() || is_registered_psd() || is_registered_eps()) &&
-       _at->send("AT+COPS?") && _at->recv("+COPS: %34[^\n]\n", str)) {
-        if (sscanf(str, "%*u,%*u,\"%*[^\"]\",%u", &status) >= 1) {
-            set_rat(status);
-        }
-    }
-
-    UNLOCK();
-    return (successCount >= 3);
 }
 
 // Get the device ID.
@@ -520,14 +569,23 @@ UbloxCellularGenericBase::UbloxCellularGenericBase(bool debug_on, PinName tx,
 
     // Error cases, out of band handling
     _at->oob("ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
-    _at->oob("+CME ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
-    _at->oob("+CMS ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));
+    _at->oob("+CME ERROR", callback(this, &UbloxCellularGenericBase::CMX_ERROR_URC));
+    _at->oob("+CMS ERROR", callback(this, &UbloxCellularGenericBase::CMX_ERROR_URC));
+
+    // Registration status, out of band handling
+    _at->oob("+CREG", callback(this, &UbloxCellularGenericBase::CREG_URC));
+    _at->oob("+CGREG", callback(this, &UbloxCellularGenericBase::CGREG_URC));
+    _at->oob("+CEREG", callback(this, &UbloxCellularGenericBase::CEREG_URC));
+
+    // Capture the UMWI, just to stop it getting in the way
+    _at->oob("+UMWI", callback(this, &UbloxCellularGenericBase::UMWI_URC));
 }
 
 // Destructor.
 UbloxCellularGenericBase::~UbloxCellularGenericBase()
 {
     deinit();
+    delete _at;
     delete _dev_info;
     delete _fh;
 }
@@ -565,10 +623,6 @@ bool UbloxCellularGenericBase::init(const char *pin)
 void UbloxCellularGenericBase::deinit()
 {
     power_down_modem();
-
-    delete _at;
-    _at = NULL;
-
     _modem_initialised = false;
 }
 

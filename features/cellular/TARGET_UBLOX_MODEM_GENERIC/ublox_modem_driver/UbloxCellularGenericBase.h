@@ -235,6 +235,12 @@ protected:
      */
     bool nwk_registration_status(device_type dev);
 
+    /** Perform deregistration from the network.
+     *
+     * @return true if successful, otherwise false.
+     */
+    bool nwk_deregistration();
+
     /** Lock a mutex when accessing the modem.
      */
     void lock(void)     { _mtx.lock(); }

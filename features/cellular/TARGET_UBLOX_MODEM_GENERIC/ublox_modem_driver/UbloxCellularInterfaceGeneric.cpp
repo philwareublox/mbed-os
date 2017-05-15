@@ -262,12 +262,16 @@ nsapi_error_t UbloxCellularInterfaceGeneric::connect()
 // User initiated disconnect.
 nsapi_error_t UbloxCellularInterfaceGeneric::disconnect()
 {
-    nsapi_error_t nsapi_error = nsapi_ppp_disconnect(_fh);
+    nsapi_error_t nsapi_error = NSAPI_ERROR_DEVICE_ERROR;
 
-    // Get the "NO CARRIER" response out of the modem
-    // so as not to confuse subsequent AT commands
-    if (_at) {
+    if (nsapi_ppp_disconnect(_fh) == NSAPI_ERROR_OK) {
+        // Get the "NO CARRIER" response out of the modem
+        // so as not to confuse subsequent AT commands
         _at->send("AT") && _at->recv("NO CARRIER");
+
+        if (nwk_deregistration()) {
+            nsapi_error = NSAPI_ERROR_OK;
+        }
     }
 
     return nsapi_error;

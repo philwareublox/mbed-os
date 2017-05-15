@@ -67,7 +67,7 @@ void UbloxCellularInterfaceGenericAtData::clearSocket(UbloxCellularInterfaceGene
     if (socket != NULL) {
         socket->tcpConnected        = false;
         socket->modemHandle         = SOCKET_UNUSED;
-        socket->timeoutMilliseconds = TIMEOUT_BLOCKING;
+        _timeout                    = TIMEOUT_BLOCKING;
         socket->pending             = 0;
     }
 }
@@ -113,7 +113,7 @@ void UbloxCellularInterfaceGenericAtData::UUSORD_URC()
         tr_debug("Socket 0x%08x: modem handle %d has %d bytes pending",
                  (unsigned int) socket, a, b);
         if (socket != NULL) {
-            socket->pending = b;
+            socket->pending += b;
         }
     }
 }
@@ -131,7 +131,7 @@ void UbloxCellularInterfaceGenericAtData::UUSORF_URC()
         tr_debug("Socket 0x%08x: modem handle %d has %d bytes pending",
                  (unsigned int) socket, a, b);
         if (socket != NULL) {
-            socket->pending = b;
+            socket->pending += b;
         }
     }
 }
@@ -307,7 +307,7 @@ bool UbloxCellularInterfaceGenericAtData::connectModemStack()
     LOCK();
 
     // Check the profile
-    if (_at->send("AT+UPSND=" PROFILE ",8") && _at->recv("+UPSND: %*d,%*d,%d", &active) &&
+    if (_at->send("AT+UPSND=" PROFILE ",8") && _at->recv("+UPSND: %*d,%*d,%d\n", &active) &&
         _at->recv("OK")) {
         if (active == 1) {
             // Disconnect the profile already if it is connected
@@ -400,7 +400,7 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::socket_open(nsapi_socket_t *h
 
         if (success) {
             nsapiError = NSAPI_ERROR_NO_SOCKET;
-            if (_at->recv("+USOCR: %d", &modemHandle) && (modemHandle != SOCKET_UNUSED) &&
+            if (_at->recv("+USOCR: %d\n", &modemHandle) && (modemHandle != SOCKET_UNUSED) &&
                 _at->recv("OK")) {
                 tr_debug("Socket 0x%8x: handle %d was created", (unsigned int) socket, modemHandle);
                 clearSocket(socket);
@@ -438,7 +438,7 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::socket_close(nsapi_socket_t h
 nsapi_error_t UbloxCellularInterfaceGenericAtData::socket_bind(nsapi_socket_t handle,
                                                                const SocketAddress &address)
 {
-    nsapi_error_t nsapiError = NSAPI_ERROR_DEVICE_ERROR;
+    nsapi_error_t nsapiError = NSAPI_ERROR_NO_SOCKET;
     int proto;
     int modemHandle;
     SockCtrl savedSocket;
@@ -448,20 +448,20 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::socket_bind(nsapi_socket_t ha
 
     // Query the socket type
     if (_at->send("AT+USOCTL=%d,0", socket->modemHandle) &&
-        _at->recv("+USOCTL: %*d,0,%d", &proto) &&
+        _at->recv("+USOCTL: %*d,0,%d\n", &proto) &&
         _at->recv("OK")) {
         savedSocket = *socket;
+        nsapiError = NSAPI_ERROR_DEVICE_ERROR;
         // Now close the socket and re-open it with the binding given
         if (_at->send("AT+USOCL=%d", socket->modemHandle) &&
             _at->recv("OK")) {
             clearSocket(socket);
+            nsapiError = NSAPI_ERROR_CONNECTION_LOST;
             if (_at->send("AT+USOCR=%d,%d", proto, address.get_port()) &&
-                _at->recv("+USOCR: %d", &modemHandle) && (modemHandle != SOCKET_UNUSED) &&
+                _at->recv("+USOCR: %d\n", &modemHandle) && (modemHandle != SOCKET_UNUSED) &&
                 _at->recv("OK")) {
                 *socket = savedSocket;
                 nsapiError = NSAPI_ERROR_OK;
-            } else {
-                nsapiError = NSAPI_ERROR_CONNECTION_LOST;
             }
         }
     }
@@ -622,7 +622,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
                         // Wait for the "OK" before continuing
                         _at->recv("OK");
                     }
-                } else if (!TIMEOUT(timer, socket->timeoutMilliseconds)) {
+                } else if (!TIMEOUT(timer, _timeout)) {
                     // Wait for URCs
                     _at->recv(UNNATURAL_STRING);
                 } else {
@@ -647,11 +647,11 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
 
     if (success) {
         nsapiErrorSize = cnt;
-        if ((cnt == 0) && (socket->timeoutMilliseconds != TIMEOUT_BLOCKING)) {
+        if ((cnt == 0) && (_timeout != TIMEOUT_BLOCKING)) {
             nsapiErrorSize = NSAPI_ERROR_WOULD_BLOCK;
         }
     }
-    tr_debug("socket_recv: %d \"%*s\"", cnt, cnt, buf - cnt);
+    tr_debug("socket_recv: %d \"%*.*s\"", cnt, cnt, cnt, buf - cnt);
 
     return nsapiErrorSize;
 }
@@ -691,13 +691,15 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
                           ipAddress, &port, &sz)) {
                 tmpBuf = (char *) malloc(sz + 2); // +2 for leading and trailing quotes
                 if (tmpBuf != NULL) {
+                    tr_debug("...reading %d bytes from handle %d...", sz, socket->modemHandle);
                     readSize = _at->read(tmpBuf, sz + 2);
-                    if ((readSize > 0) &&
-                        (*(tmpBuf + readSize - sz - 2) == '\"') && *(tmpBuf + readSize - 1) == '\"') {
+                    tr_debug("tmpBuf: %d |%*.*s|", readSize, readSize, readSize, tmpBuf);
+                    if ((*tmpBuf == '\"') && *(tmpBuf + sz + 1) == '\"') {
                         if (sz > size) {
                             sz = size;
                         }
-                        memcpy(buf, (tmpBuf + readSize - sz - 1), sz);
+                        tr_debug("...copying %d bytes into buffer...", sz);
+                        memcpy(buf, tmpBuf + 1, sz);
                         socket->pending -= readBlk;
                         address->set_ip_address(ipAddress);
                         address->set_port(port);
@@ -716,7 +718,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
               // Should never fail to read when there is pending data
                 success = false;
             }
-        } else if (!TIMEOUT(timer, socket->timeoutMilliseconds)) {
+        } else if (!TIMEOUT(timer, _timeout)) {
             // Wait for URCs
             _at->recv(UNNATURAL_STRING);
         } else {
@@ -733,7 +735,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
     if (success) {
         nsapiErrorSize = cnt;
     }
-    tr_debug("socket_recv: %d \"%*s\"", cnt, cnt, buf - cnt);
+    tr_debug("socket_recvfrom: %d \"%*.*s\"", cnt, cnt, cnt, buf - cnt);
 
     return nsapiErrorSize;
 }
@@ -938,7 +940,7 @@ nsapi_error_t UbloxCellularInterfaceGenericAtData::disconnect()
 {
     nsapi_error_t nsapi_error = NSAPI_ERROR_DEVICE_ERROR;
 
-    if (disconnectModemStack()) {
+    if (disconnectModemStack() && nwk_deregistration()) {
         nsapi_error = NSAPI_ERROR_OK;
     }
 
@@ -1048,31 +1050,6 @@ const char *UbloxCellularInterfaceGenericAtData::get_netmask()
 const char *UbloxCellularInterfaceGenericAtData::get_gateway()
 {
     return get_ip_address();
-}
-
-// Set a socket to be blocking.
-nsapi_error_t UbloxCellularInterfaceGenericAtData::set_blocking(nsapi_socket_t handle, bool blocking)
-{
-    nsapi_error_t nsapiError;
-
-    if (blocking) {
-        nsapiError = set_timeout(handle, -1);
-    } else {
-        nsapiError = set_timeout(handle, 0);
-    }
-
-    return nsapiError;
-}
-
-// Set a socket timeout.
-nsapi_error_t UbloxCellularInterfaceGenericAtData::set_timeout(nsapi_socket_t handle, int timeout)
-{
-    SockCtrl *socket = (SockCtrl *) handle;
-
-    tr_debug("socket_set_timeout(0x%08x, %d)", (unsigned int) handle, timeout);
-    socket->timeoutMilliseconds = timeout;
-
-    return NSAPI_ERROR_OK;
 }
 
 // Determine if there's anything to read.

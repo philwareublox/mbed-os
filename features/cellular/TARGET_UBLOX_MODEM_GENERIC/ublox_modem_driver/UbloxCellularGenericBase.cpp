@@ -170,7 +170,7 @@ bool UbloxCellularGenericBase::get_iccid()
     // ICCID is a serial number identifying the SIM.
     // AT Command Manual UBX-13002752, section 4.12
     success = _at->send("AT+CCID") && _at->recv("+CCID: %20[^\n]\nOK\n", _dev_info->iccid);
-    tr_debug("DevInfo: CCID=%s", _dev_info->iccid);
+    tr_debug("DevInfo: ICCID=%s", _dev_info->iccid);
 
     UNLOCK();
     return success;
@@ -391,23 +391,24 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
         }
 
         if (atSuccess) {
-            // In case this is a new instance of the driver while the
-            // modem underneath has not been power cycled to cause the
-            // registration status to change and trigger a URC,
-            // query the registration status directly as well
-            if (_at->send("AT+CREG?") && _at->recv("OK")) {
-                // Answer will be processed by URC
-            }
-            if (_at->send("AT+CGREG?") && _at->recv("OK")) {
-                // Answer will be processed by URC
-            }
-            if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
-                if (_at->send("AT+CEREG?") && _at->recv("OK")) {
+            // Now register
+            if (_at->send("AT+COPS=0") && _at->recv("OK")) {
+                // Query the registration status directly as well,
+                // just in case
+                if (_at->send("AT+CREG?") && _at->recv("OK")) {
                     // Answer will be processed by URC
+                }
+                if (_at->send("AT+CGREG?") && _at->recv("OK")) {
+                    // Answer will be processed by URC
+                }
+                if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
+                    if (_at->send("AT+CEREG?") && _at->recv("OK")) {
+                        // Answer will be processed by URC
+                    }
                 }
             }
 
-            // Now wait for registration to succeed
+            // Wait for registration to succeed
             _at->set_timeout(1000);
             for (int waitSeconds = 0; !registered && (waitSeconds < 180); waitSeconds++) {
                 registered = is_registered_psd() || is_registered_csd() || is_registered_eps();
@@ -418,13 +419,28 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
     }
 
     if (registered) {
-       if (_at->send("AT+COPS?") && _at->recv("+COPS: %*d,%*d,\"%*[^\"]\",%d", &status)) {
+       if (_at->send("AT+COPS?") && _at->recv("+COPS: %*d,%*d,\"%*[^\"]\",%d\n", &status)) {
             set_rat(status);
        }
     }
 
     UNLOCK();
     return registered;
+}
+
+// Perform deregistration.
+bool UbloxCellularGenericBase::nwk_deregistration()
+{
+    bool success = false;
+
+    if (_at->send("AT+COPS=2") && _at->recv("OK")) {
+        _dev_info->reg_status_csd = CSD_NOT_REGISTERED_NOT_SEARCHING;
+        _dev_info->reg_status_psd = PSD_NOT_REGISTERED_NOT_SEARCHING;
+        _dev_info->reg_status_eps = EPS_NOT_REGISTERED_NOT_SEARCHING;
+        success = true;
+    }
+
+    return success;
 }
 
 // Get the device ID.
@@ -488,7 +504,8 @@ bool UbloxCellularGenericBase::initialise_sim_card()
     for (retry_count = 0; !done && (retry_count < 10); retry_count++) {
         char pinstr[16];
 
-        if (_at->send("AT+CPIN?") && _at->recv("+CPIN: %15[^\n]\nOK\n", pinstr)) {
+        if (_at->send("AT+CPIN?") && _at->recv("+CPIN: %15[^\n]\n", pinstr) &&
+            _at->recv("OK")) {
             done = true;
             if (strcmp(pinstr, "SIM PIN") == 0) {
                 _sim_pin_check_enabled = true;

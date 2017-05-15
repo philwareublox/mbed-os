@@ -216,25 +216,6 @@ public:
      */
     virtual const char *get_gateway();
 
-    /** Set blocking or non-blocking mode of the socket.
-     *
-     *  set_blocking(false) is equivalent to set_timeout(-1).
-     *  set_blocking(true) is equivalent to set_timeout(0).
-     *
-     *  @param blocking True for blocking mode, false for non-blocking mode.
-     *  @return         0 on success, negative error code on failure
-     */
-    virtual nsapi_error_t set_blocking(nsapi_socket_t handle, bool blocking);
-
-    /** Set timeout on blocking socket operations.
-     *
-     *  set_timeout(-1) is equivalent to set_blocking(true).
-     *
-     *  @param timeout  Timeout in milliseconds
-     *  @return         0 on success, negative error code on failure
-     */
-    virtual nsapi_error_t set_timeout(nsapi_socket_t handle, int timeout);
-
     /** Get the number of bytes pending for reading for this socket.
      *
      * @param handle    The socket handle.
@@ -253,7 +234,7 @@ protected:
 
     /** Infinite timeout.
      */
-    #define TIMEOUT_BLOCKING -1
+    #define TIMEOUT_BLOCKING ((uint32_t) 0xFFFFFFFF)
 
     /** Socket "unused" value
      */
@@ -263,7 +244,6 @@ protected:
      */
     typedef struct {
         int modemHandle;
-        int timeoutMilliseconds;
         volatile bool tcpConnected;
         volatile nsapi_size_t pending;
     } SockCtrl;
@@ -298,13 +278,13 @@ protected:
 
     /** Activate one of the on-board modem's connection profiles.
      *
-     * @param apn      the apn to use.
-     * @param username the username to use.
-     * @param password the password to use.
-     * @param auth     the authentication method to use
+     * @param apn      The APN to use.
+     * @param username The user name to use.
+     * @param password The password to use.
+     * @param auth     The authentication method to use
      *                 (NSAPI_SECURITY_NONE, NSAPI_SECURITY_PAP,
      *                 NSAPI_SECURITY_CHAP or NSAPI_SECURITY_UNKNOWN).
-     * @return true if successful, otherwise false.
+     * @return         True if successful, otherwise false.
      */
     virtual bool activateProfile(const char* apn, const char* username,
                                  const char* password, nsapi_security_t auth);
@@ -317,35 +297,41 @@ protected:
 
     /** Activate a profile based on connection ID.
      *
-     * @param cid       the connection ID.
-     * @param apn       the apn to use.
-     * @param username  the username to use.
-     * @param password  the password to use.
-     * @param auth      the authentication method to use.
-     * @return true if successful, otherwise false.
+     * @param cid       The connection ID.
+     * @param apn       The APN to use.
+     * @param username  The user name to use.
+     * @param password  The password to use.
+     * @param auth      The authentication method to use.
+     * @return          True if successful, otherwise false.
      */
     virtual bool activateProfileByCid(int cid, const char* apn, const char* username,
                                       const char* password, nsapi_security_t auth);
 
     /** Connect the on board IP stack of the modem.
      *
-     * @return true if successful, otherwise false.
+     * @return         True if successful, otherwise false.
      */
     virtual bool connectModemStack();
 
     /** Disconnect the on board IP stack of the modem.
      *
-     * @return true if successful, otherwise false.
+     * @return         True if successful, otherwise false.
      */
     virtual bool disconnectModemStack();
 
     /** Provide access to the NetworkStack object
      *
-     *  @return The underlying NetworkStack object
+     *  @return        The underlying NetworkStack object
      */
     virtual NetworkStack *get_stack();
 
-     /** Open a socket.
+protected:
+
+    /** Socket timeout value
+     */
+    uint32_t _timeout;
+
+    /** Open a socket.
      *
      *  Creates a network socket and stores it in the specified handle.
      *  The handle must be passed to following calls on the socket.
@@ -396,6 +382,14 @@ protected:
      *  The socket must be connected to a remote host. Returns the number of
      *  bytes sent from the buffer.
      *
+     *  PACKET SIZES: the maximum packet size that can be sent is limited
+     *  by the configuration value platform.buffered-serial-txbuf-size, which
+     *  defaults to 256.  The maximum UDP packet size that can be sent by
+     *  this class is platform.buffered-serial-txbuf-size - 36, so to
+     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
+     *  to add a target override where platform.buffered-serial-txbuf-size
+     *  is set to 1060.
+     *
      *  @param handle   Socket handle.
      *  @param data     Buffer of data to send to the host.
      *  @param size     Size of the buffer in bytes.
@@ -409,6 +403,14 @@ protected:
      *
      *  Sends data to the specified address. Returns the number of bytes
      *  sent from the buffer.
+     *
+     *  PACKET SIZES: the maximum packet size that can be sent is limited
+     *  by the configuration value platform.buffered-serial-txbuf-size, which
+     *  defaults to 256.  The maximum UDP packet size that can be sent by
+     *  this class is platform.buffered-serial-txbuf-size - 36, so to
+     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
+     *  to add a target override where platform.buffered-serial-txbuf-size
+     *  is set to 1060.
      *
      *  @param handle   Socket handle.
      *  @param address  The SocketAddress of the remote host.
@@ -425,6 +427,14 @@ protected:
      *  The socket must be connected to a remote host. Returns the number of
      *  bytes received into the buffer.
      *
+     *  PACKET SIZES: the maximum packet size that can be received is limited
+     *  by the configuration value platform.buffered-serial-rxbuf-size, which
+     *  defaults to 256.  The maximum UDP packet size that can be sent by
+     *  this class is platform.buffered-serial-rxbuf-size - 36, so to
+     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
+     *  to add a target override where platform.buffered-serial-rxbuf-size
+     *  is set to 1060.
+     *
      *  @param handle   Socket handle.
      *  @param data     Destination buffer for data received from the host.
      *  @param size     Size of the buffer in bytes.
@@ -438,6 +448,14 @@ protected:
      *
      *  Receives data and stores the source address in address if address
      *  is not NULL. Returns the number of bytes received into the buffer.
+     *
+     *  PACKET SIZES: the maximum packet size that can be received is limited
+     *  by the configuration value platform.buffered-serial-rxbuf-size, which
+     *  defaults to 256.  The maximum UDP packet size that can be sent by
+     *  this class is platform.buffered-serial-rxbuf-size - 36, so to
+     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
+     *  to add a target override where platform.buffered-serial-rxbuf-size
+     *  is set to 1060.
      *
      *  @param handle   Socket handle.
      *  @param address  Destination for the source address or NULL.
@@ -532,7 +550,7 @@ private:
 
     #define IS_PROFILE(p) (((p) >= 0) && (((unsigned int) p) < (sizeof(_httpProfiles)/sizeof(_httpProfiles[0]))) \
                            && (_httpProfiles[p].modemHandle != HTTP_PROF_UNUSED))
-    #define TIMEOUT(t, ms)  ((ms != TIMEOUT_BLOCKING) && (ms < t.read_ms()))
+    #define TIMEOUT(t, ms)  ((ms != TIMEOUT_BLOCKING) && (ms < (uint32_t) t.read_ms()))
     #define stringify(a) str(a)
     #define str(a) #a
 

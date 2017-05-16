@@ -68,7 +68,6 @@
             "value": 1500
         }
     },
-    "macros": ["OS_MAINSTKSIZE=512"],
     "target_overrides": {
         "*": {
             "lwip.ipv4-enabled": true,

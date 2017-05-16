@@ -770,9 +770,9 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 // Test cases
 Case cases[] = {
     Case("Set randomise", test_set_randomise),
-    //Case("UDP echo test", test_udp_echo),
-    //Case("UDP async echo test", test_udp_echo_async),
-    //Case("TCP echo test", test_tcp_echo),
+    Case("UDP echo test", test_udp_echo),
+    Case("UDP async echo test", test_udp_echo_async),
+    Case("TCP echo test", test_tcp_echo),
     Case("TCP async echo test", test_tcp_echo_async),
     Case("Connect with credentials", test_connect_credentials),
     Case("Connect with preset credentials", test_connect_preset_credentials),

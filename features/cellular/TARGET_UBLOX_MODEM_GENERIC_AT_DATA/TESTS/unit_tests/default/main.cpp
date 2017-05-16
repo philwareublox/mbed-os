@@ -602,7 +602,7 @@ void test_tcp_echo_async() {
     // Test min, max, and some random size in-between
     do_tcp_echo_async(&sock, 1, &dataAvailable);
     do_tcp_echo_async(&sock, MBED_CONF_APP_TCP_MAX_PACKET_SIZE, &dataAvailable);
-    for (x = 0; x < 100; x++) {
+    for (x = 0; x < 10; x++) {
         size = (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1;
         size = fix(size, MBED_CONF_APP_TCP_MAX_PACKET_SIZE + 1);
         do_tcp_echo_async(&sock, size, &dataAvailable);

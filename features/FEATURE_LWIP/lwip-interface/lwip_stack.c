@@ -35,8 +35,8 @@
 #include "lwip/udp.h"
 #include "netif/lwip_ethernet.h"
 #include "emac_api.h"
-
 #include "ppp_lwip.h"
+#include "lwip_tcp_isn.h"
 
 static nsapi_error_t mbed_lwip_err_remap(err_t err);
 
@@ -194,7 +194,9 @@ static bool convert_lwip_addr_to_mbed(nsapi_addr_t *out, const ip_addr_t *in)
         return true;
     }
 #endif
+#if LWIP_IPV6 && LWIP_IPV4
     return false;
+#endif
 }
 
 static const ip_addr_t *mbed_lwip_get_ipv4_addr(const struct netif *netif)
@@ -344,6 +346,14 @@ static void mbed_lwip_set_mac_address(struct netif *netif)
 #endif
 
     netif->hwaddr_len = ETH_HWADDR_LEN;
+
+    /* Use mac address as additional seed to random number generator */
+    uint64_t seed = netif->hwaddr[0];
+    for (uint8_t i = 1; i < 8; i++) {
+        seed <<= 8;
+        seed |= netif->hwaddr[i % 6];
+    }
+    lwip_add_random_seed(seed);
 }
 
 static void mbed_lwip_record_mac_address(const struct netif *netif)
@@ -376,7 +386,9 @@ char *mbed_lwip_get_ip_address(char *buf, nsapi_size_t buflen)
         return ip4addr_ntoa_r(ip_2_ip4(addr), buf, buflen);
     }
 #endif
+#if LWIP_IPV6 && LWIP_IPV4
     return NULL;
+#endif
 }
 
 const char *mbed_lwip_get_netmask(char *buf, nsapi_size_t buflen)
@@ -409,8 +421,19 @@ char *mbed_lwip_get_gateway(char *buf, nsapi_size_t buflen)
 
 static void mbed_lwip_core_init(void)
 {
+
     // Check if we've already brought up lwip
     if (!lwip_inited) {
+	// Seed lwip random
+        lwip_seed_random();
+
+        // Initialise TCP sequence number
+        uint32_t tcp_isn_secret[4];
+        for (int i = 0; i < 4; i++) {
+            tcp_isn_secret[i] = LWIP_RAND();
+        }
+        lwip_init_tcp_isn(0, (u8_t *) &tcp_isn_secret);
+
         sys_sem_new(&lwip_tcpip_inited, 0);
         sys_sem_new(&lwip_netif_linked, 0);
         sys_sem_new(&lwip_netif_unlinked, 0);

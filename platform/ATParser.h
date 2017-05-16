@@ -17,6 +17,8 @@
  * Parser for the AT command syntax
  *
  */
+#ifndef MBED_ATPARSER_H
+#define MBED_ATPARSER_H
 
 #include "mbed.h"
 #include <cstdarg>
@@ -285,3 +287,4 @@ public:
     void abort();
 };
 
+#endif //MBED_ATPARSER_H

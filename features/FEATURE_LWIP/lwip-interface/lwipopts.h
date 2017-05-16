@@ -185,7 +185,7 @@
 // Support Multicast
 #include "stdlib.h"
 #define LWIP_IGMP                   LWIP_IPV4
-#define LWIP_RAND()                 rand()
+#define LWIP_RAND()                 lwip_get_random()
 
 #define LWIP_COMPAT_SOCKETS         0
 #define LWIP_POSIX_SOCKETS_IO_NAMES 0
@@ -276,8 +276,6 @@
 #define PRINTPKT_SUPPORT            0
 #define PPP_LOGIT_BUFSIZE           512
 
-//Hate the config hassle.
-//#define LWIP_USE_EXTERNAL_MBEDTLS       1
 // Broadcast
 #define IP_SOF_BROADCAST            0
 #define IP_SOF_BROADCAST_RECV       0
@@ -293,5 +291,14 @@
 
 #define DNS_TABLE_SIZE                  2
 #define DNS_MAX_NAME_LENGTH             128
+
+#include <lwip/arch.h>
+#include "lwip_random.h"
+#include "lwip_tcp_isn.h"
+#define LWIP_HOOK_TCP_ISN lwip_hook_tcp_isn
+#ifdef MBEDTLS_MD5_C
+#include "mbedtls/inc/mbedtls/md5.h"
+#define LWIP_USE_EXTERNAL_MBEDTLS 1
+#endif
 
 #endif /* LWIPOPTS_H_ */

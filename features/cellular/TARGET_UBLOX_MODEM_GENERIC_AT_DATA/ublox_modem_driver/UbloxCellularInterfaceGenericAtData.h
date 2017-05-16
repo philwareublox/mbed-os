@@ -33,7 +33,7 @@
  *      file system, etc.) while the connection is up.
  *
  *  2.  The UbloxCellularGenericDataAtExt class can
- *      be used to provide a very simply HTTP interface
+ *      be used to provide a very simple HTTP interface
  *      using the modem's on-board HTTP client.
  *
  *  3.  LWIP is not required (and hence RAM is saved).
@@ -41,7 +41,7 @@
  *  The disadvantage is that some additional parsing
  *  (at the AT interface) has to go on in order to exchange
  *  IP packets, so this is less efficient under heavy loads.
- *  TCP Server and setting/getting of socket options is
+ *  Also TCP Server and setting/getting of socket options is
  *  currently not supported.
  */
 
@@ -57,18 +57,24 @@ public:
                                          int baud = MBED_CONF_UBLOX_CELL_GEN_DRV_BAUD_RATE);
     ~UbloxCellularInterfaceGenericAtData();
 
+    /** The amount of extra space needed in terms of AT interface
+     * characters to get a chunk of user data (i.e. one UDP packet
+     * or a portion of a TCP packet) across the AT interface.
+     */
+    #define AT_PACKET_OVERHEAD 77
+
     /**
      * The profile to use.
      */
     #define PROFILE "0"
 
-    /** Translates a hostname to an IP address with specific version.
+    /** Translates a host name to an IP address with specific version.
      *
-     *  The hostname may be either a domain name or an IP address. If the
-     *  hostname is an IP address, no network transactions will be performed.
+     *  The host name may be either a domain name or an IP address. If the
+     *  host name is an IP address, no network transactions will be performed.
      *
-     *  If no stack-specific DNS resolution is provided, the hostname
-     *  will be resolve using a UDP socket on the stack.
+     *  If no stack-specific DNS resolution is provided, the host name
+     *  will be resolved using a UDP socket on the stack.
      *
      *  @param host     Hostname to resolve.
      *  @param address  Destination for the host SocketAddress.
@@ -114,7 +120,7 @@ public:
      *
      *  @param sim_pin     PIN for the SIM card.
      *  @param apn         Optionally, access point name.
-     *  @param uname       Optionally, Username.
+     *  @param uname       Optionally, user name.
      *  @param pwd         Optionally, password.
      *  @return            NSAPI_ERROR_OK on success, or negative error code on failure.
      */
@@ -240,14 +246,28 @@ protected:
      * Note: this is NOT the same as the limitations on user packet
      * sizes, it is for internal purposes only.
      */
-    #define MAX_WRITE_SIZE 1024
+    #ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE
+    #  define MAX_WRITE_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - AT_PACKET_OVERHEAD
+    #  if MAX_WRITE_SIZE <= 0
+    #    error MAX_WRITE_SIZE is zero or less!
+    #  endif
+    #else
+    #  define MAX_WRITE_SIZE 1024
+    #endif
 
     /** The maximum number of bytes in a packet that can be read from
      * from the AT interface in one go.
      * Note: this is NOT the same as the limitations on user packet
      * sizes, it is for internal purposes only.
      */
-    #define MAX_READ_SIZE 1024
+    #ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE
+    #  define MAX_READ_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - AT_PACKET_OVERHEAD
+    #  if MAX_READ_SIZE <= 0
+    #    error MAX_READ_SIZE is zero or less!
+    #  endif
+    #else
+    #  define MAX_READ_SIZE 1024
+    #endif
 
     /** Management structure for sockets.
      */
@@ -347,7 +367,8 @@ protected:
      *  @param port     Optional port to bind to.
      *  @return         0 on success, negative error code on failure.
      */
-    virtual nsapi_error_t socket_open(nsapi_socket_t *handle, nsapi_protocol_t proto);
+    virtual nsapi_error_t socket_open(nsapi_socket_t *handle,
+                                      nsapi_protocol_t proto);
 
     /** Close a socket.
      *
@@ -370,7 +391,8 @@ protected:
      *  @param address  Local address to bind (of which only the port is used).
      *  @return         0 on success, negative error code on failure.
      */
-    virtual nsapi_error_t socket_bind(nsapi_socket_t handle, const SocketAddress &address);
+    virtual nsapi_error_t socket_bind(nsapi_socket_t handle,
+                                      const SocketAddress &address);
 
     /** Connects TCP socket to a remote host.
      *
@@ -381,13 +403,16 @@ protected:
      *  @param address  The SocketAddress of the remote host.
      *  @return         0 on success, negative error code on failure.
      */
-    virtual nsapi_error_t socket_connect(nsapi_socket_t handle, const SocketAddress &address);
+    virtual nsapi_error_t socket_connect(nsapi_socket_t handle,
+                                         const SocketAddress &address);
 
     /** Send data over a TCP socket.
      *
      *  The socket must be connected to a remote host. Returns the number of
-     *  bytes sent from the buffer.  There is no upper packet size limit other than
-     *  that implicit in internet communication.
+     *  bytes sent from the buffer.  There is no upper buffer size limit and
+     *  the maximum packet size is not connected with the
+     *  platform.buffered-serial-txbuf-size/platform.buffered-serial-rxbuf-size
+     *  definitions.
      *
      *  @param handle   Socket handle.
      *  @param data     Buffer of data to send to the host.
@@ -403,13 +428,23 @@ protected:
      *  Sends data to the specified address. Returns the number of bytes
      *  sent from the buffer.
      *
-     *  PACKET SIZES: the maximum packet size that can be sent is limited
-     *  by the configuration value platform.buffered-serial-txbuf-size, which
-     *  defaults to 256.  The maximum TCP packet size that can be sent by
-     *  this class is platform.buffered-serial-txbuf-size - 76 and a
-     *  maximum of 1024 (at the AT interface) so to allow sending of a 1024
-     *  byte UDP packet, edit your mbed_app.json to add a target override
-     *  where platform.buffered-serial-txbuf-size is set to 1100.
+     *  PACKET SIZES: the maximum packet size that can be sent in a single
+     *  UDP packet is limited by the configuration value
+     *  platform.buffered-serial-txbuf-size (defaults to 256).
+     *  The maximum UDP packet size is:
+     *
+     *  platform.buffered-serial-txbuf-size - AT_PACKET_OVERHEAD
+     *
+     *  ...with a maximum of 1024 bytes (at the AT interface). So, to allow sending
+     *  of a 1024 byte UDP packet, edit your mbed_app.json to add a target override
+     *  setting platform.buffered-serial-txbuf-size to 1101.  However, for
+     *  UDP packets, 508 bytes is considered a more realistic size, taking into
+     *  account fragmentation sizes over the public internet, which leads to a
+     *  platform.buffered-serial-txbuf-size/platform.buffered-serial-rxbuf-size
+     *  setting of 585.
+     *
+     *  If size is larger than this limit, the data will be split across separate
+     *  UDP packets.
      *
      *  @param handle   Socket handle.
      *  @param address  The SocketAddress of the remote host.
@@ -418,14 +453,18 @@ protected:
      *  @return         Number of sent bytes on success, negative error
      *                  code on failure.
      */
-    virtual nsapi_size_or_error_t socket_sendto(nsapi_socket_t handle, const SocketAddress &address,
-                                                const void *data, nsapi_size_t size);
+    virtual nsapi_size_or_error_t socket_sendto(nsapi_socket_t handle,
+                                                const SocketAddress &address,
+                                                const void *data,
+                                                nsapi_size_t size);
 
     /** Receive data over a TCP socket.
      *
      *  The socket must be connected to a remote host. Returns the number of
-     *  bytes received into the buffer.  There is no upper packet size limit
-     *  other than that implicit in internet communication.
+     *  bytes received into the buffer.  There is no upper buffer size limit
+     *  and the maximum packet size is not connected with the
+     *  platform.buffered-serial-txbuf-size/platform.buffered-serial-rxbuf-size
+     *  definitions.
      *
      *  @param handle   Socket handle.
      *  @param data     Destination buffer for data received from the host.
@@ -441,13 +480,19 @@ protected:
      *  Receives data and stores the source address in address if address
      *  is not NULL. Returns the number of bytes received into the buffer.
      *
-     *  PACKET SIZES: the maximum packet size that can be received is limited
-     *  by the configuration value platform.buffered-serial-rxbuf-size, which
-     *  defaults to 256.  The maximum TCP packet size that can be received by
-     *  this class is platform.buffered-serial-rxbuf-size - 76 and a
-     *  maximum of 1024 (at the AT interface) so to allow reception of a 1024
-     *  byte TCP packet, edit your mbed_app.json to add a target override
-     *  where platform.buffered-serial-rxbuf-size is set to 1100.
+     *  PACKET SIZES: the maximum packet size that can be retrieved in a
+     *  single call to this method is limited by the configuration value
+     *  platform.buffered-serial-rxbuf-size (default 256).  The maximum
+     *  UDP packet size is:
+     *
+     *  platform.buffered-serial-rxbuf-size - AT_PACKET_OVERHEAD
+     *
+     *  ...with a maximum of 1024 (at the AT interface). So to allow reception of a
+     *  1024 byte UDP packet in a single call, edit your mbed_app.json to add a
+     *  target override setting platform.buffered-serial-rxbuf-size to 1101.
+     *
+     *  If the received packet is larger than this limit, any remainder will
+     *  be returned in subsequent calls to this method.
      *
      *  @param handle   Socket handle.
      *  @param address  Destination for the source address or NULL.
@@ -456,7 +501,8 @@ protected:
      *  @return         Number of received bytes on success, negative error
      *                  code on failure.
      */
-    virtual nsapi_size_or_error_t socket_recvfrom(nsapi_socket_t handle, SocketAddress *address,
+    virtual nsapi_size_or_error_t socket_recvfrom(nsapi_socket_t handle,
+                                                  SocketAddress *address,
                                                   void *data, nsapi_size_t size);
 
     /** Register a callback on state change of the socket
@@ -472,7 +518,8 @@ protected:
      *  @param callback Function to call on state change
      *  @param data     Argument to pass to callback
      */
-    virtual void socket_attach(nsapi_socket_t handle, void (*callback)(void *), void *data);
+    virtual void socket_attach(nsapi_socket_t handle, void (*callback)(void *),
+                               void *data);
 
     /** Listen for connections on a TCP socket
      *
@@ -504,7 +551,8 @@ protected:
      *  @return         0 on success, negative error code on failure
      */
     virtual nsapi_error_t socket_accept(nsapi_socket_t server,
-                                        nsapi_socket_t *handle, SocketAddress *address = 0);
+                                        nsapi_socket_t *handle,
+                                        SocketAddress *address = 0);
 
     /*  Set stack-specific socket options
      *
@@ -520,7 +568,8 @@ protected:
      *  @return         0 on success, negative error code on failure
      */
     virtual nsapi_error_t setsockopt(nsapi_socket_t handle, int level,
-                                     int optname, const void *optval, unsigned optlen);
+                                     int optname, const void *optval,
+                                     unsigned optlen);
 
     /*  Get stack-specific socket options
      *
@@ -536,7 +585,8 @@ protected:
      *  @return         0 on success, negative error code on failure
      */
     virtual nsapi_error_t getsockopt(nsapi_socket_t handle, int level,
-                                     int optname, void *optval, unsigned *optlen);
+                                     int optname, void *optval,
+                                     unsigned *optlen);
 
 private:
 

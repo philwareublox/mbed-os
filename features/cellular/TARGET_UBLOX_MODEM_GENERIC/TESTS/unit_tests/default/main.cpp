@@ -11,7 +11,8 @@
 using namespace utest::v1;
 
 // IMPORTANT!!! if you make a change to the tests here you should
-// make the same change to the tests under the AT DATA driver.
+// check whether the same change should be made to the tests under
+// the AT DATA driver.
 
 // ----------------------------------------------------------------
 // COMPILE-TIME MACROS
@@ -104,12 +105,12 @@ using namespace utest::v1;
 # define MBED_CONF_APP_LOCAL_PORT 15
 #endif
 
-// Size limits
+// UDP packet size limit for testing
 #ifndef MBED_CONF_APP_UDP_MAX_PACKET_SIZE
 # define MBED_CONF_APP_UDP_MAX_PACKET_SIZE 508
 #endif
 
-// Size limits
+// TCP packet size limit for testing
 #ifndef MBED_CONF_APP_MBED_CONF_APP_TCP_MAX_PACKET_SIZE
 # define MBED_CONF_APP_TCP_MAX_PACKET_SIZE 1500
 #endif
@@ -191,6 +192,20 @@ static void connection_down_cb(nsapi_error_t err)
     connection_has_gone_down = true;
 }
 
+// Make sure that size is greater than 0 and no more than limit,
+// useful since, when moduloing a very large number number,
+// compilers sometimes screw up and produce a small *negative*
+// number.  Who knew?  For example, GCC decided that
+// 492318453 (0x1d582ef5) modulo 508 was -47 (0xffffffd1).
+static int fix (int size, int limit) {
+    if (size <= 0) {
+        size = limit / 2; // better than 1
+    } else if (size > limit) {
+        size = limit;
+    }
+    return size;
+}
+
 // Do a UDP socket echo test to a given host of a given packet size
 static void do_udp_echo(UDPSocket *sock, SocketAddress *hostAddress, int size) {
     bool success = false;
@@ -199,7 +214,7 @@ static void do_udp_echo(UDPSocket *sock, SocketAddress *hostAddress, int size) {
 
     // Retry this a few times, don't want to fail due to a flaky link
     for (int x = 0; !success && (x < 3); x++) {
-        tr_debug("Echo testing UDP packet size %d byte(s), try %d", size, x + 1);
+        printf("Echo testing UDP packet size %d byte(s), try %d.\n", size, x + 1);
         if ((sock->sendto(*hostAddress, (void*) sendData, size) == size) &&
             (sock->recvfrom(hostAddress, recvData, size) == size)) {
             TEST_ASSERT (memcmp(sendData, recvData, size) == 0);
@@ -217,7 +232,7 @@ static void do_tcp_echo(TCPSocket *sock, int size) {
     void * recvData = malloc (size);
     TEST_ASSERT(recvData != NULL);
 
-    tr_debug("Echo testing TCP packet size %d byte(s)", size);
+    printf("Echo testing TCP packet size %d byte(s).\n", size);
     TEST_ASSERT(sock->send((void*) sendData, size) == size);
     TEST_ASSERT(sock->recv(recvData, size) == size);
     TEST_ASSERT (memcmp(sendData, recvData, size) == 0);
@@ -242,8 +257,8 @@ static void do_ntp(UbloxCellularInterfaceGeneric *pInterface)
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_NTP_SERVER, &hostAddress) == 0);
     hostAddress.set_port(MBED_CONF_APP_NTP_PORT);
 
-    tr_debug("UDP: NIST server %s address: %s on port %d.", MBED_CONF_APP_NTP_SERVER,
-             hostAddress.get_ip_address(), hostAddress.get_port());
+    printf("UDP: NIST server %s address: %s on port %d.\n", MBED_CONF_APP_NTP_SERVER,
+           hostAddress.get_ip_address(), hostAddress.get_port());
 
     sock.set_timeout(10000);
 
@@ -268,7 +283,7 @@ static void do_ntp(UbloxCellularInterfaceGeneric *pInterface)
             if (local_time) {
                 char time_string[25];
                 if (strftime(time_string, sizeof(time_string), "%a %b %d %H:%M:%S %Y", local_time) > 0) {
-                    tr_debug("NTP timestamp is %s.", time_string);
+                    printf("NTP timestamp is %s.\n", time_string);
                 }
             }
         }
@@ -313,7 +328,8 @@ void test_set_randomise() {
     UDPSocket sock;
     SocketAddress hostAddress;
 
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     do_ntp(pInterface);
     TEST_ASSERT(!connection_has_gone_down);
     drop_connection(pInterface);
@@ -323,15 +339,18 @@ void test_set_randomise() {
 void  test_udp_echo() {
     UDPSocket sock;
     SocketAddress hostAddress;
+    int x;
+    int size;
 
     pInterface->deinit();
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
 
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
     hostAddress.set_port(MBED_CONF_APP_ECHO_UDP_PORT);
 
-    tr_debug("UDP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
-             hostAddress.get_ip_address(), hostAddress.get_port());
+    printf("UDP: Server %s address: %s on port %d.\n", MBED_CONF_APP_ECHO_SERVER,
+           hostAddress.get_ip_address(), hostAddress.get_port());
 
     TEST_ASSERT(sock.open(pInterface) == 0)
 
@@ -340,28 +359,36 @@ void  test_udp_echo() {
     // Test min, max, and some random sizes in-between
     do_udp_echo(&sock, &hostAddress, 1);
     do_udp_echo(&sock, &hostAddress, MBED_CONF_APP_UDP_MAX_PACKET_SIZE);
-    for (int x = 0; x < 10; x++) {
-        do_udp_echo(&sock, &hostAddress, (rand() % MBED_CONF_APP_UDP_MAX_PACKET_SIZE) + 1);
+    for (x = 0; x < 10; x++) {
+        size = (rand() % MBED_CONF_APP_UDP_MAX_PACKET_SIZE) + 1;
+        size = fix(size, MBED_CONF_APP_UDP_MAX_PACKET_SIZE + 1);
+        do_udp_echo(&sock, &hostAddress, size);
     }
 
     sock.close();
 
     drop_connection(pInterface);
+
+    printf("%d UDP packets of size up to %d byte(s) echoed successfully.\n", x,
+           MBED_CONF_APP_UDP_MAX_PACKET_SIZE);
 }
 
 // Test TCP data exchange
 void  test_tcp_echo() {
     TCPSocket sock;
     SocketAddress hostAddress;
+    int x;
+    int size;
 
     pInterface->deinit();
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
 
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
     hostAddress.set_port(MBED_CONF_APP_ECHO_TCP_PORT);
 
-    tr_debug("TCP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
-             hostAddress.get_ip_address(), hostAddress.get_port());
+    printf("TCP: Server %s address: %s on port %d.\n", MBED_CONF_APP_ECHO_SERVER,
+           hostAddress.get_ip_address(), hostAddress.get_port());
 
     TEST_ASSERT(sock.open(pInterface) == 0)
 
@@ -371,19 +398,25 @@ void  test_tcp_echo() {
     // Test min, max, and some random size in-between
     do_tcp_echo(&sock, 1);
     do_tcp_echo(&sock, MBED_CONF_APP_TCP_MAX_PACKET_SIZE);
-    for (int x = 0; x < 10; x++) {
-        do_tcp_echo(&sock, (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1);
+    for (x = 0; x < 10; x++) {
+        size = (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1;
+        size = fix(size, MBED_CONF_APP_TCP_MAX_PACKET_SIZE + 1);
+        do_tcp_echo(&sock, size);
     }
 
     sock.close();
 
     drop_connection(pInterface);
+
+    printf("%d TCP packets of size up to %d byte(s) echoed successfully.\n",
+           x, MBED_CONF_APP_TCP_MAX_PACKET_SIZE);
 }
 
 // Connect with credentials included in the connect request
 void test_connect_credentials() {
 
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
 }
@@ -393,7 +426,8 @@ void test_connect_preset_credentials() {
 
     pInterface->deinit();
     TEST_ASSERT(pInterface->init(MBED_CONF_APP_DEFAULT_PIN));
-    pInterface->set_credentials(MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD);
+    pInterface->set_credentials(MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME,
+                                MBED_CONF_APP_PASSWORD);
     TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
@@ -410,14 +444,16 @@ void test_check_sim_pin_pending() {
     // then try connecting
     pInterface->check_sim_pin(true);
     pInterface->change_sim_pin(MBED_CONF_APP_ALT_PIN);
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
     pInterface->deinit();
 
     // Now change the PIN back to what it was before
     pInterface->change_sim_pin(MBED_CONF_APP_DEFAULT_PIN);
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_ALT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_ALT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
     pInterface->deinit();
@@ -425,7 +461,8 @@ void test_check_sim_pin_pending() {
     // Check that it was changed back, and this time
     // use the other way of entering the PIN
     pInterface->set_sim_pin(MBED_CONF_APP_DEFAULT_PIN);
-    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME,
+                                    MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
     pInterface->deinit();
@@ -433,12 +470,14 @@ void test_check_sim_pin_pending() {
     // Remove PIN checking again and check that it no
     // longer matters what the PIN is
     pInterface->check_sim_pin(false);
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
     pInterface->deinit();
     TEST_ASSERT(pInterface->init(NULL));
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_INCORRECT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_INCORRECT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
 
@@ -460,7 +499,8 @@ void test_check_sim_pin_immediate() {
     pInterface->change_sim_pin(MBED_CONF_APP_ALT_PIN, true);
     pInterface->deinit();
     TEST_ASSERT(pInterface->init(NULL));
-    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_ALT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_ALT_PIN, MBED_CONF_APP_APN,
+                                    MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
 
@@ -471,7 +511,8 @@ void test_check_sim_pin_immediate() {
     pInterface->deinit();
     pInterface->set_sim_pin(MBED_CONF_APP_DEFAULT_PIN);
     TEST_ASSERT(pInterface->init(NULL));
-    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME,
+                                    MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
 
@@ -482,7 +523,8 @@ void test_check_sim_pin_immediate() {
     pInterface->check_sim_pin(false, true);
     pInterface->deinit();
     TEST_ASSERT(pInterface->init(MBED_CONF_APP_INCORRECT_PIN));
-    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pInterface->connect(NULL, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME,
+                                    MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pInterface);
     drop_connection(pInterface);
 
@@ -501,7 +543,8 @@ void test_connect_local_instance_last_test() {
     pLocalInterface = new UbloxCellularInterfaceGeneric(true);
     pLocalInterface->connection_status_cb(connection_down_cb);
 
-    TEST_ASSERT(pLocalInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pLocalInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                         MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pLocalInterface);
     drop_connection(pLocalInterface);
     delete pLocalInterface;
@@ -509,7 +552,8 @@ void test_connect_local_instance_last_test() {
     pLocalInterface = new UbloxCellularInterfaceGeneric(true);
     pLocalInterface->connection_status_cb(connection_down_cb);
 
-    TEST_ASSERT(pLocalInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+    TEST_ASSERT(pLocalInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN,
+                                         MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
     use_connection(pLocalInterface);
     drop_connection(pLocalInterface);
     delete pLocalInterface;
@@ -527,7 +571,8 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 }
 
 // IMPORTANT!!! if you make a change to the tests here you should
-// make the same change to the tests under the AT DATA driver.
+// check whether the same change should be made to the tests under
+// the AT DATA driver.
 
 // Test cases
 Case cases[] = {

@@ -584,9 +584,8 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_send(nsapi_soc
 
         if (_at->send("AT+USOWR=%d,%d", socket->modem_handle, blk) && _at->recv("@")) {
             wait_ms(50);
-            if ((_at->write(buf, blk) >= (int) blk) &&
-                 _at->recv("OK")) {
-            } else {
+            if ((_at->write(buf, blk) < (int) blk) ||
+                 !_at->recv("OK")) {
                 success = false;
             }
         } else {
@@ -614,6 +613,8 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_sendto(nsapi_s
     nsapi_size_or_error_t nsapi_error_size = NSAPI_ERROR_DEVICE_ERROR;
     bool success = true;
     const char *buf = (const char *) data;
+    nsapi_size_t blk = MAX_WRITE_SIZE;
+    nsapi_size_t cnt = size;
     SockCtrl *socket = (SockCtrl *) handle;
 
     tr_debug("socket_sendto(0x%8x, %s(:%d), 0x%08x, %d)", (unsigned int) handle,
@@ -621,19 +622,32 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_sendto(nsapi_s
 
     MBED_ASSERT (check_socket(socket));
 
-    LOCK();
+    while ((cnt > 0) && success) {
+        if (cnt < blk) {
+            blk = cnt;
+        }
+        LOCK();
 
-    if (_at->send("AT+USOST=%d,\"%s\",%d,%d", socket->modem_handle,
-                   address.get_ip_address(), address.get_port(), size) &&
-        _at->recv("@")) {
-        wait_ms(50);
-        success = (_at->write(buf, size) >= (int) size) && _at->recv("OK");
+        if (_at->send("AT+USOST=%d,\"%s\",%d,%d", socket->modem_handle,
+                      address.get_ip_address(), address.get_port(), blk) &&
+            _at->recv("@")) {
+            wait_ms(50);
+            if ((_at->write(buf, blk) >= (int) blk) &&
+                 _at->recv("OK")) {
+            } else {
+                success = false;
+            }
+        } else {
+            success = false;
+        }
+
+        UNLOCK();
+        buf += blk;
+        cnt -= blk;
     }
 
-    UNLOCK();
-
     if (success) {
-        nsapi_error_size = size;
+        nsapi_error_size = size - cnt;
     }
 
     return nsapi_error_size;
@@ -665,6 +679,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
         at_set_timeout(1000);
 
         read_blk = socket->pending;
+        if (read_blk > MAX_READ_SIZE) {
+            read_blk = MAX_READ_SIZE;
+        }
         if (read_blk > 0) {
             if (_at->send("AT+USORD=%d,%d", socket->modem_handle, read_blk) &&
                 _at->recv("+USORD: %*d,%d,", &sz)) {
@@ -747,17 +764,20 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
         at_set_timeout(1000);
 
         read_blk = socket->pending;
+        if (read_blk > MAX_READ_SIZE) {
+            read_blk = MAX_READ_SIZE;
+        }
         if (read_blk > 0) {
             memset (ipAddress, 0, sizeof (ipAddress)); // Ensure terminator
             // Note: the maximum length of UDP packet we can receive comes from
             // fitting all of the following into one buffer:
             //
-            // +USORF: xx,"max.len.ip.address.ipv4.or.ipv6",yyyyy,wwww,"the_data"\n
+            // +USORF: xx,"max.len.ip.address.ipv4.or.ipv6",yyyyy,wwww,"the_data"\r\n
             //
             // where xx is the handle, max.len.ip.address.ipv4.or.ipv6 is NSAPI_IP_SIZE,
             // yyyyy is the port number (max 65536), wwww is the length of the data and
-            // the_data is binary data. I make that 28 + 48 + len(the_data),
-            // so the overhead is 76 bytes.
+            // the_data is binary data. I make that 29 + 48 + len(the_data),
+            // so the overhead is 77 bytes.
             if (_at->send("AT+USORF=%d,%d", socket->modem_handle, read_blk) &&
                 _at->recv("+USORF: %*d,\"%" stringify(NSAPI_IP_SIZE) "[^\"]\",%d,%d,",
                           ipAddress, &port, &sz)) {

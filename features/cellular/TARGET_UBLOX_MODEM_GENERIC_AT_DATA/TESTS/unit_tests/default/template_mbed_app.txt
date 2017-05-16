@@ -63,6 +63,10 @@
             "help": "The maximum UDP packet size to use when testing; 1024 bytes is the limit at the AT interface but 508 bytes is considered more reliable for the public internet",
             "value": 508
         }
+        "udp-max-frag-packet-size": {
+            "help": "The maximum size of UDP data to test with that we know will be fragmented across multiple UDP packets",
+            "value": 1500
+        }
     },
     "macros": ["OS_MAINSTKSIZE=512"],
     "target_overrides": {
@@ -71,8 +75,8 @@
             "platform.stdio-convert-newlines": true,
             "platform.stdio-baud-rate": 9600,
             "platform.default-serial-baud-rate": 115200, 
-            "platform.buffered-serial-txbuf-size": 584,
-            "platform.buffered-serial-rxbuf-size": 584,
+            "platform.buffered-serial-txbuf-size": 585,
+            "platform.buffered-serial-rxbuf-size": 585,
             "mbed-trace.enable": 1
         }
     }

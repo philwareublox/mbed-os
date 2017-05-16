@@ -247,12 +247,16 @@ protected:
      * sizes, it is for internal purposes only.
      */
     #ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE
-    #  define MAX_WRITE_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - AT_PACKET_OVERHEAD
-    #  if MAX_WRITE_SIZE <= 0
-    #    error MAX_WRITE_SIZE is zero or less!
+    #  if MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - AT_PACKET_OVERHEAD < 1024
+    #    define MAX_WRITE_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - AT_PACKET_OVERHEAD
+    #    if MAX_WRITE_SIZE <= 0
+    #      error MAX_WRITE_SIZE is zero or less!
+    #    endif
+    #  else
+    #    define MAX_WRITE_SIZE 1024
     #  endif
     #else
-    #  define MAX_WRITE_SIZE 1024
+    #   define MAX_WRITE_SIZE 1024
     #endif
 
     /** The maximum number of bytes in a packet that can be read from
@@ -261,13 +265,18 @@ protected:
      * sizes, it is for internal purposes only.
      */
     #ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE
-    #  define MAX_READ_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - AT_PACKET_OVERHEAD
-    #  if MAX_READ_SIZE <= 0
-    #    error MAX_READ_SIZE is zero or less!
+    #  if MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - AT_PACKET_OVERHEAD < 1024
+    #    define MAX_READ_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - AT_PACKET_OVERHEAD
+    #    if MAX_READ_SIZE <= 0
+    #      error MAX_READ_SIZE is zero or less!
+    #    endif
+    #  else
+    #    define MAX_READ_SIZE 1024
     #  endif
     #else
-    #  define MAX_READ_SIZE 1024
+    #   define MAX_READ_SIZE 1024
     #endif
+
 
     /** Management structure for sockets.
      */
@@ -435,7 +444,7 @@ protected:
      *
      *  platform.buffered-serial-txbuf-size - AT_PACKET_OVERHEAD
      *
-     *  ...with a maximum of 1024 bytes (at the AT interface). So, to allow sending
+     *  ...with a limit of 1024 bytes (at the AT interface). So, to allow sending
      *  of a 1024 byte UDP packet, edit your mbed_app.json to add a target override
      *  setting platform.buffered-serial-txbuf-size to 1101.  However, for
      *  UDP packets, 508 bytes is considered a more realistic size, taking into
@@ -487,12 +496,13 @@ protected:
      *
      *  platform.buffered-serial-rxbuf-size - AT_PACKET_OVERHEAD
      *
-     *  ...with a maximum of 1024 (at the AT interface). So to allow reception of a
+     *  ...with a limit of 1024 (at the AT interface). So to allow reception of a
      *  1024 byte UDP packet in a single call, edit your mbed_app.json to add a
      *  target override setting platform.buffered-serial-rxbuf-size to 1101.
      *
      *  If the received packet is larger than this limit, any remainder will
-     *  be returned in subsequent calls to this method.
+     *  be returned in subsequent calls to this method.  Once a single UDP
+     *  packet has been received, this method will return.
      *
      *  @param handle   Socket handle.
      *  @param address  Destination for the source address or NULL.

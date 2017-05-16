@@ -573,7 +573,7 @@ void test_tcp_echo() {
     printf("%d TCP packets of size up to %d byte(s) echoed successfully.\n", x, MBED_CONF_APP_TCP_MAX_PACKET_SIZE);
 }
 
-// Test TCP data exchange
+// Test TCP data exchange via the asynchronous sigio() mechanism
 void test_tcp_echo_async() {
     TCPSocket sock;
     SocketAddress hostAddress;
@@ -595,8 +595,6 @@ void test_tcp_echo_async() {
     // Set up the async callback and set the timeout to zero
     sock.sigio(callback(async_cb, &dataAvailable));
     sock.set_timeout(0);
-
-    sock.set_timeout(1000);
 
     TEST_ASSERT(sock.connect(hostAddress) == 0);
     // Test min, max, and some random size in-between

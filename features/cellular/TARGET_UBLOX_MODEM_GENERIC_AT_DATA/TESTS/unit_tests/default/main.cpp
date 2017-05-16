@@ -32,8 +32,8 @@ using namespace utest::v1;
 // The credentials of the SIM in the board.
 #ifndef MBED_CONF_APP_DEFAULT_PIN
 // Note: this is the PIN for the SIM with CCID
-// 8944501104169549834.
-# define MBED_CONF_APP_DEFAULT_PIN "0779"
+// 8944501104169548380.
+# define MBED_CONF_APP_DEFAULT_PIN "5134"
 #endif
 #ifndef MBED_CONF_APP_APN
 # define MBED_CONF_APP_APN         "jtm2m"
@@ -73,14 +73,20 @@ using namespace utest::v1;
 
 // Servers and ports
 #ifndef MBED_CONF_APP_ECHO_SERVER
-# define MBED_CONF_APP_ECHO_SERVER "echo.u-blox.com"
+//# define MBED_CONF_APP_ECHO_SERVER "echo.u-blox.com"
+# define MBED_CONF_APP_ECHO_SERVER "ciot.it-sgn.u-blox.com"
 #else
-# ifndef MBED_CONF_APP_ECHO_PORT
-#  error "MBED_CONF_APP_ECHO_PORT must be defined if MBED_CONF_APP_ECHO_SERVER is defined"
+# if !defined (MBED_CONF_APP_ECHO_UDP_PORT) && !defined (MBED_CONF_APP_ECHO_TCP_PORT)
+#  error "MBED_CONF_APP_ECHO_UDP_PORT or MBED_CONF_APP_ECHO_TCP_PORT must be defined if MBED_CONF_APP_ECHO_SERVER is defined"
 # endif
 #endif
-#ifndef MBED_CONF_APP_ECHO_PORT
-# define MBED_CONF_APP_ECHO_PORT 7
+#ifndef MBED_CONF_APP_ECHO_UDP_PORT
+//# define MBED_CONF_APP_ECHO_UDP_PORT 7
+# define MBED_CONF_APP_ECHO_UDP_PORT 5050
+#endif
+#ifndef MBED_CONF_APP_ECHO_TCP_PORT
+//# define MBED_CONF_APP_ECHO_TCP_PORT 7
+# define MBED_CONF_APP_ECHO_TCP_PORT 5055
 #endif
 
 #ifndef MBED_CONF_APP_NTP_SERVER
@@ -101,28 +107,28 @@ using namespace utest::v1;
 // Size limits
 #ifndef MBED_CONF_APP_UDP_MAX_PACKET_SIZE
 // The maximum UDP packet size is determined
-// by the BufferedSerial Tx and Tx buffer
-// sizes and is the buffer size minus 36 bytes.
+// by the BufferedSerial Tx and Rx buffer
+// sizes and is the buffer size minus 76 bytes.
 //
 // 1024 is the limit at the AT interface but it is
 // not considered reliable over the internet,
 // 508 bytes is more realistic, so
 // platform.buffered-serial-txbuf-size and
 // platform.buffered-serial-rxbuf-size would be
-// set to 544.
+// set to 583.
 # ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE
 #   ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE
 #     if MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE < MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE
-#      define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - 36
+#      define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - 76
 #     else
-#      define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - 36
+#      define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - 76
 #     endif
 #   else
-#    define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - 36
+#    define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_RXBUF_SIZE - 76
 #   endif
 # else
 #   ifdef MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE
-#     define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - 36
+#     define MBED_CONF_APP_UDP_MAX_PACKET_SIZE MBED_CONF_PLATFORM_BUFFERED_SERIAL_TXBUF_SIZE - 76
 #   else
 #     define MBED_CONF_APP_UDP_MAX_PACKET_SIZE 508
 #   endif
@@ -130,6 +136,11 @@ using namespace utest::v1;
 # if MBED_CONF_APP_UDP_MAX_PACKET_SIZE < 0
 #  error MBED_CONF_APP_UDP_MAX_PACKET_SIZE is less than zero!
 # endif
+#endif
+
+// Size limits
+#ifndef MBED_CONF_APP_MBED_CONF_APP_TCP_MAX_PACKET_SIZE
+# define MBED_CONF_APP_TCP_MAX_PACKET_SIZE 1500
 #endif
 
 // ----------------------------------------------------------------
@@ -145,6 +156,7 @@ static UbloxCellularInterfaceGenericAtData *pInterface = new UbloxCellularInterf
 // Connection flag
 static bool connection_has_gone_down = false;
 
+// Data to exchange
 static const char sendData[] =  "_____0000:0123456789012345678901234567890123456789"
                                 "01234567890123456789012345678901234567890123456789"
                                 "_____0100:0123456789012345678901234567890123456789"
@@ -213,18 +225,106 @@ static void connection_down_cb(nsapi_error_t err)
 static void do_udp_echo(UDPSocket *sock, SocketAddress *hostAddress, int size) {
     bool success = false;
     void * recvData = malloc (size);
+    SocketAddress senderAddress;
     TEST_ASSERT(recvData != NULL);
 
     // Retry this a few times, don't want to fail due to a flaky link
-    for (int x = 0; x < 3; x++) {
+    for (int x = 0; !success && (x < 3); x++) {
         tr_debug("Echo testing UDP packet size %d byte(s), try %d", size, x + 1);
         if ((sock->sendto(*hostAddress, (void*) sendData, size) == size) &&
-            (sock->recvfrom(hostAddress, recvData, size) == size)) {
+            (sock->recvfrom(&senderAddress, recvData, size) == size)) {
             TEST_ASSERT (memcmp(sendData, recvData, size) == 0);
+            TEST_ASSERT (strcmp(senderAddress.get_ip_address(), hostAddress->get_ip_address()) == 0);
+            TEST_ASSERT (senderAddress.get_port() == hostAddress->get_port());
             success = true;
         }
     }
     TEST_ASSERT (success);
+    TEST_ASSERT(!connection_has_gone_down);
+
+    free (recvData);
+}
+
+// The asynchronous callback
+static void async_cb(bool *dataAvailable) {
+
+    TEST_ASSERT (dataAvailable != NULL);
+    *dataAvailable = true;
+}
+
+// Do a UDP echo but using the asynchronous interface
+static void do_udp_echo_async(UDPSocket *sock, SocketAddress *hostAddress, int size, bool *dataAvailable) {
+    void * recvData = malloc (size);
+    SocketAddress senderAddress;
+    Timer timer;
+    TEST_ASSERT(recvData != NULL);
+
+    // Retry this a few times, don't want to fail due to a flaky link
+    *dataAvailable = false;
+    for (int x = 0; !*dataAvailable && (x < 3); x++) {
+        tr_debug("Echo testing UDP packet size %d byte(s) async, try %d", size, x + 1);
+        if (sock->sendto(*hostAddress, (void *) sendData, size) == size) {
+            // Wait for data to arrive
+            timer.start();
+            while (!*dataAvailable && (timer.read_ms() < 10000)) {
+                if (*dataAvailable) {
+                    TEST_ASSERT(sock->recvfrom(&senderAddress, recvData, size) == size);
+                    TEST_ASSERT(memcmp(sendData, recvData, size) == 0);
+                    TEST_ASSERT(strcmp(senderAddress.get_ip_address(), hostAddress->get_ip_address()) == 0);
+                    TEST_ASSERT(senderAddress.get_port() == hostAddress->get_port());
+                }
+            }
+            timer.stop();
+            timer.reset();
+        }
+    }
+
+    TEST_ASSERT(*dataAvailable);
+    TEST_ASSERT(!connection_has_gone_down);
+
+    free (recvData);
+}
+
+// Do a TCP socket echo test of a given packet size
+static void do_tcp_echo(TCPSocket *sock, int size) {
+    void * recvData = malloc (size);
+    TEST_ASSERT(recvData != NULL);
+
+    tr_debug("Echo testing TCP packet size %d byte(s)", size);
+    TEST_ASSERT(sock->send((void*) sendData, size) == size);
+    TEST_ASSERT(sock->recv(recvData, size) == size);
+    TEST_ASSERT (memcmp(sendData, recvData, size) == 0);
+    TEST_ASSERT(!connection_has_gone_down);
+
+    free (recvData);
+}
+
+// Do a TCP echo but using the asynchronous interface
+static void do_tcp_echo_async(TCPSocket *sock, int size, bool *dataAvailable) {
+    void * recvData = malloc (size);
+    int recvSize = 0;
+    int x;
+    Timer timer;
+    TEST_ASSERT(recvData != NULL);
+
+    *dataAvailable = false;
+    tr_debug("Echo testing TCP packet size %d byte(s) async", size);
+    TEST_ASSERT (sock->send(sendData, size) == size);
+    // Wait for all the echoed data to arrive
+    timer.start();
+    while ((recvSize < size) && (timer.read_ms() < 10000)) {
+        if (*dataAvailable) {
+            *dataAvailable = false;
+            x = sock->recv((recvData + recvSize), size);
+            TEST_ASSERT(x > 0);
+            recvSize += x;
+        }
+        wait_ms(10);
+    }
+    TEST_ASSERT(recvSize == size);
+    TEST_ASSERT(memcmp(sendData, recvData, size) == 0);
+    timer.stop();
+
     TEST_ASSERT(!connection_has_gone_down);
 
     free (recvData);
@@ -263,7 +363,7 @@ static void do_ntp(UbloxCellularInterfaceGenericAtData *pInterface)
 
     tr_debug("UDP: Values returned by NTP server:");
     for (size_t i = 0; i < sizeof(ntp_values) / sizeof(ntp_values[0]); ++i) {
-        tr_debug("\t[%02d] 0x%"PRIX32, i, common_read_32_bit((uint8_t*) &(ntp_values[i])));
+        tr_debug("\t[%02d] 0x%08x", i, (unsigned int) common_read_32_bit((uint8_t*) &(ntp_values[i])));
         if (i == 10) {
             const time_t timestamp = common_read_32_bit((uint8_t*) &(ntp_values[i])) - TIME1970;
             srand (timestamp);
@@ -324,7 +424,7 @@ void test_set_randomise() {
 }
 
 // Test UDP data exchange
-void  test_udp_echo() {
+void test_udp_echo() {
     UDPSocket sock;
     SocketAddress hostAddress;
     SocketAddress localAddress;
@@ -332,7 +432,7 @@ void  test_udp_echo() {
     TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
 
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
-    hostAddress.set_port(MBED_CONF_APP_ECHO_PORT);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_UDP_PORT);
 
     tr_debug("UDP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
              hostAddress.get_ip_address(), hostAddress.get_port());
@@ -345,11 +445,111 @@ void  test_udp_echo() {
 
     sock.set_timeout(10000);
 
-    // Test min, max, and some random sizes inbetween
+    // Test min, max, and some random sizes in-between
     do_udp_echo(&sock, &hostAddress, 1);
     do_udp_echo(&sock, &hostAddress, MBED_CONF_APP_UDP_MAX_PACKET_SIZE);
-    for (unsigned int x = 0; x < 10; x++) {
+    for (int x = 0; x < 10; x++) {
         do_udp_echo(&sock, &hostAddress, (rand() % MBED_CONF_APP_UDP_MAX_PACKET_SIZE) + 1);
+    }
+
+    sock.close();
+
+    drop_connection(pInterface);
+}
+
+// Test UDP data exchange via the asynchronous sigio() mechanism
+void test_udp_echo_async() {
+    UDPSocket sock;
+    SocketAddress hostAddress;
+    SocketAddress localAddress;
+    bool dataAvailable = false;
+
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+
+    TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_UDP_PORT);
+
+    tr_debug("UDP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
+             hostAddress.get_ip_address(), hostAddress.get_port());
+
+    TEST_ASSERT(sock.open(pInterface) == 0)
+
+    // Set up the async callback and set the timeout to zero
+    sock.sigio(callback(async_cb, &dataAvailable));
+    sock.set_timeout(0);
+
+    // Test min, max, and some random sizes in-between
+    do_udp_echo_async(&sock, &hostAddress, 1, &dataAvailable);
+    do_udp_echo_async(&sock, &hostAddress, MBED_CONF_APP_UDP_MAX_PACKET_SIZE, &dataAvailable);
+    for (int x = 0; x < 10; x++) {
+        do_udp_echo_async(&sock, &hostAddress, (rand() % MBED_CONF_APP_UDP_MAX_PACKET_SIZE) + 1, &dataAvailable);
+    }
+
+    sock.close();
+
+    drop_connection(pInterface);
+}
+
+// Test TCP data exchange
+void test_tcp_echo() {
+    TCPSocket sock;
+    SocketAddress hostAddress;
+
+    pInterface->deinit();
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+
+    TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_TCP_PORT);
+
+    tr_debug("TCP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
+             hostAddress.get_ip_address(), hostAddress.get_port());
+
+    TEST_ASSERT(sock.open(pInterface) == 0)
+
+    sock.set_timeout(1000);
+
+    TEST_ASSERT(sock.connect(hostAddress) == 0);
+    // Test min, max, and some random size in-between
+    do_tcp_echo(&sock, 1);
+    do_tcp_echo(&sock, MBED_CONF_APP_TCP_MAX_PACKET_SIZE);
+    for (int x = 0; x < 10; x++) {
+        do_tcp_echo(&sock, (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1);
+    }
+
+    sock.close();
+
+    drop_connection(pInterface);
+}
+
+// Test TCP data exchange
+void test_tcp_echo_async() {
+    TCPSocket sock;
+    SocketAddress hostAddress;
+    bool dataAvailable = false;
+
+    pInterface->deinit();
+    TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
+
+    TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_TCP_PORT);
+
+    tr_debug("TCP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
+             hostAddress.get_ip_address(), hostAddress.get_port());
+
+    TEST_ASSERT(sock.open(pInterface) == 0)
+
+    // Set up the async callback and set the timeout to zero
+    sock.sigio(callback(async_cb, &dataAvailable));
+    sock.set_timeout(0);
+
+    sock.set_timeout(1000);
+
+    TEST_ASSERT(sock.connect(hostAddress) == 0);
+    // Test min, max, and some random size in-between
+    do_tcp_echo_async(&sock, 1, &dataAvailable);
+    do_tcp_echo_async(&sock, MBED_CONF_APP_TCP_MAX_PACKET_SIZE, &dataAvailable);
+    for (int x = 0; x < 10; x++) {
+        do_tcp_echo_async(&sock, (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1, &dataAvailable);
     }
 
     sock.close();
@@ -500,7 +700,7 @@ void test_connect_local_instance_last_test() {
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea with a timeout
-    GREENTEA_SETUP(540, "default_auto");
+    GREENTEA_SETUP(900, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
@@ -511,6 +711,9 @@ utest::v1::status_t test_setup(const size_t number_of_cases) {
 Case cases[] = {
     Case("Set randomise", test_set_randomise),
     Case("UDP echo test", test_udp_echo),
+    Case("UDP async echo test", test_udp_echo_async),
+    Case("TCP echo test", test_tcp_echo),
+    Case("TCP async echo test", test_tcp_echo_async),
     Case("Connect with credentials", test_connect_credentials),
     Case("Connect with preset credentials", test_connect_preset_credentials),
 #if MBED_CONF_APP_RUN_SIM_PIN_CHANGE_TESTS

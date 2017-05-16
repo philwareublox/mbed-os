@@ -226,11 +226,10 @@ void UbloxCellularGenericBase::parser_abort_cb()
 // Callback for CME ERROR and CMS ERROR.
 void UbloxCellularGenericBase::CMX_ERROR_URC()
 {
-    char description[48];
+    char buf[48];
 
-    memset (description, 0, sizeof (description)); // Ensure terminator
-    if (_at->recv(": %48[^\n]\n", description)) {
-        tr_debug("AT error \"%.*s\"", sizeof (description), description);
+    if (read_at_to_newline(buf, sizeof (buf)) > 0) {
+        tr_debug("AT error %s", buf);
     }
     parser_abort_cb();
 }
@@ -238,18 +237,20 @@ void UbloxCellularGenericBase::CMX_ERROR_URC()
 // Callback for circuit switched registration URC.
 void UbloxCellularGenericBase::CREG_URC()
 {
-    char string[10];
+    char buf[10];
     int status;
 
     // If this is the URC it will be a single
     // digit followed by \n.  If it is the
     // answer to a CREG query, it will be
-    // a "%d,%d\n" where the second digit
+    // a ": %d,%d\n" where the second digit
     // indicates the status
-    if (_at->recv(": %10[^\n]\n", string)) {
-        if (sscanf(string, "%*d,%d", &status) == 1) {
+    // Note: not calling _at->recv() from here as we're
+    // already in an _at->recv()
+    if (read_at_to_newline(buf, sizeof (buf)) > 0) {
+        if (sscanf(buf, ": %*d,%d", &status) == 1) {
             set_nwk_reg_status_csd(status);
-        } else if (sscanf(string, "%d", &status) == 1) {
+        } else if (sscanf(buf, ": %d", &status) == 1) {
             set_nwk_reg_status_csd(status);
         }
     }
@@ -258,18 +259,20 @@ void UbloxCellularGenericBase::CREG_URC()
 // Callback for packet switched registration URC.
 void UbloxCellularGenericBase::CGREG_URC()
 {
-    char string[10];
+    char buf[10];
     int status;
 
     // If this is the URC it will be a single
     // digit followed by \n.  If it is the
     // answer to a CGREG query, it will be
-    // a "%d,%d\n" where the second digit
+    // a ": %d,%d\n" where the second digit
     // indicates the status
-    if (_at->recv(": %10[^\n]\n", string)) {
-        if (sscanf(string, "%*d,%d", &status) == 1) {
+    // Note: not calling _at->recv() from here as we're
+    // already in an _at->recv()
+    if (read_at_to_newline(buf, sizeof (buf)) > 0) {
+        if (sscanf(buf, ": %*d,%d", &status) == 1) {
             set_nwk_reg_status_psd(status);
-        } else if (sscanf(string, "%d", &status) == 1) {
+        } else if (sscanf(buf, ": %d", &status) == 1) {
             set_nwk_reg_status_psd(status);
         }
     }
@@ -278,18 +281,20 @@ void UbloxCellularGenericBase::CGREG_URC()
 // Callback for EPS registration URC.
 void UbloxCellularGenericBase::CEREG_URC()
 {
-    char string[10];
+    char buf[10];
     int status;
 
     // If this is the URC it will be a single
     // digit followed by \n.  If it is the
     // answer to a CEREG query, it will be
-    // a "%d,%d\n" where the second digit
+    // a ": %d,%d\n" where the second digit
     // indicates the status
-    if (_at->recv(": %10[^\n]\n", string)) {
-        if (sscanf(string, "%*d,%d", &status) == 1) {
+    // Note: not calling _at->recv() from here as we're
+    // already in an _at->recv()
+    if (read_at_to_newline(buf, sizeof (buf)) > 0) {
+        if (sscanf(buf, ": %*d,%d", &status) == 1) {
             set_nwk_reg_status_eps(status);
-        } else if (sscanf(string, "%d", &status) == 1) {
+        } else if (sscanf(buf, ": %d", &status) == 1) {
             set_nwk_reg_status_eps(status);
         }
     }
@@ -298,18 +303,48 @@ void UbloxCellularGenericBase::CEREG_URC()
 // Callback UMWI, just filtering it out.
 void UbloxCellularGenericBase::UMWI_URC()
 {
-    _at->recv(": %*d,%*d\n");
+    char buf[10];
+
+    // Note: not calling _at->recv() from here as we're
+    // already in an _at->recv()
+    read_at_to_newline(buf, sizeof (buf));
 }
 
 /**********************************************************************
  * PROTECTED METHODS
  **********************************************************************/
 
+// Set the AT parser timeout.
+void UbloxCellularGenericBase::at_set_timeout(int timeout) {
+    _at_timeout = timeout;
+    _at->set_timeout(timeout);
+}
+
+// Read up to size bytes from the AT interface up to a newline.
+int UbloxCellularGenericBase::read_at_to_newline(char * buf, int size)
+{
+    int count = 0;
+    int x = 0;
+
+    if (size > 0) {
+        for (count = 0; (count < size) && (x >= 0) && (x != '\n'); count++) {
+            x = _at->getc();
+            *(buf + count) = (char) x;
+        }
+
+        *(buf + count - 1) = 0;
+        count--;
+    }
+
+    return count;
+}
+
 // Power up the modem.
 // Enables the GPIO lines to the modem and then wriggles the power line in short pulses.
 bool UbloxCellularGenericBase::power_up_modem()
 {
     bool success = false;
+    int at_timeout = _at_timeout;
     LOCK();
 
     /* Initialize GPIO lines */
@@ -323,14 +358,13 @@ bool UbloxCellularGenericBase::power_up_modem()
         wait_ms(500);
         // Modem tends to spit out noise during power up - don't confuse the parser
         _at->flush();
-        _at->set_timeout(1000);
-
+        at_set_timeout(1000);
         if (_at->send("AT") && _at->recv("OK")) {
             success = true;
         }
+        at_set_timeout(at_timeout);
     }
 
-    _at->set_timeout(AT_PARSER_TIMEOUT);
 
     if (success) {
         success = _at->send("ATE0;" // Turn off modem echoing
@@ -377,6 +411,7 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
     bool atSuccess = false;
     bool registered = false;
     int status;
+    int at_timeout = _at_timeout;
     LOCK();
 
     // Enable the packet switched and network registration unsolicited result codes
@@ -409,12 +444,12 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
             }
 
             // Wait for registration to succeed
-            _at->set_timeout(1000);
+            at_set_timeout(1000);
             for (int waitSeconds = 0; !registered && (waitSeconds < 180); waitSeconds++) {
                 registered = is_registered_psd() || is_registered_csd() || is_registered_eps();
                 _at->recv(UNNATURAL_STRING);
             }
-            _at->set_timeout(AT_PARSER_TIMEOUT);
+            at_set_timeout(at_timeout);
         }
     }
 
@@ -432,6 +467,7 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
 bool UbloxCellularGenericBase::nwk_deregistration()
 {
     bool success = false;
+    LOCK();
 
     if (_at->send("AT+COPS=2") && _at->recv("OK")) {
         _dev_info->reg_status_csd = CSD_NOT_REGISTERED_NOT_SEARCHING;
@@ -440,6 +476,7 @@ bool UbloxCellularGenericBase::nwk_deregistration()
         success = true;
     }
 
+    UNLOCK();
     return success;
 }
 
@@ -563,6 +600,7 @@ UbloxCellularGenericBase::UbloxCellularGenericBase(bool debug_on, PinName tx,
 {
     _pin = NULL;
     _at = NULL;
+    _at_timeout = AT_PARSER_TIMEOUT;
     _fh = NULL;
     _debug_trace_on = false;
     _modem_initialised = false;
@@ -581,8 +619,7 @@ UbloxCellularGenericBase::UbloxCellularGenericBase(bool debug_on, PinName tx,
 
     // Set up the AT parser
     _at = new ATParser(_fh, OUTPUT_ENTER_KEY, AT_PARSER_BUFFER_SIZE,
-                       AT_PARSER_TIMEOUT,
-                       _debug_trace_on ? true : false);
+                       _at_timeout, _debug_trace_on ? true : false);
 
     // Error cases, out of band handling
     _at->oob("ERROR", callback(this, &UbloxCellularGenericBase::parser_abort_cb));

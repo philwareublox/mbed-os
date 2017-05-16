@@ -182,6 +182,10 @@ protected:
      */
     ATParser *_at;
 
+    /** The current AT parser timeout value.
+     */
+    int _at_timeout;
+
     /** File handle used by the AT parser.
      */
     FileHandle *_fh;
@@ -210,6 +214,22 @@ protected:
     /** True it the SIM requires a PIN, otherwise false.
      */
     bool _sim_pin_check_enabled;
+
+    /** Set the AT parser timeout.
+     */
+    void at_set_timeout(int timeout);
+
+    /** Read up to size characters from buf
+     * or until newline is reached, overwriting
+     * the newline with 0 and ensuring a terminator
+     * in all cases.
+     *
+     * @param buf  the buffer to write to.
+     * @param size the size of the buffer.
+     * @return the number of characters read,
+     *         not including the terminator.
+     */
+    int read_at_to_newline(char * buf, int size);
 
     /** Power up the modem.
      *

@@ -31,10 +31,9 @@ using namespace utest::v1;
 
 // The credentials of the SIM in the board.
 #ifndef MBED_CONF_APP_DEFAULT_PIN
-// Note: for the JT M2M SIMs, each SIM is set up with a randomly
-// generated default PIN.  This is the PIN for the SIM with CCID
-// 8944501104169549834.
-# define MBED_CONF_APP_DEFAULT_PIN "0779"
+// Note: this is the PIN for the SIM with CCID
+// 8944501104169548380.
+# define MBED_CONF_APP_DEFAULT_PIN "5134"
 #endif
 #ifndef MBED_CONF_APP_APN
 # define MBED_CONF_APP_APN         "jtm2m"
@@ -74,14 +73,20 @@ using namespace utest::v1;
 
 // Servers and ports
 #ifndef MBED_CONF_APP_ECHO_SERVER
-# define MBED_CONF_APP_ECHO_SERVER "echo.u-blox.com"
+//# define MBED_CONF_APP_ECHO_SERVER "echo.u-blox.com"
+# define MBED_CONF_APP_ECHO_SERVER "ciot.it-sgn.u-blox.com"
 #else
-# ifndef MBED_CONF_APP_ECHO_PORT
-#  error "MBED_CONF_APP_ECHO_PORT must be defined if MBED_CONF_APP_ECHO_SERVER is defined"
+# if !defined (MBED_CONF_APP_ECHO_UDP_PORT) && !defined (MBED_CONF_APP_ECHO_TCP_PORT)
+#  error "MBED_CONF_APP_ECHO_UDP_PORT or MBED_CONF_APP_ECHO_TCP_PORT must be defined if MBED_CONF_APP_ECHO_SERVER is defined"
 # endif
 #endif
-#ifndef MBED_CONF_APP_ECHO_PORT
-# define MBED_CONF_APP_ECHO_PORT 7
+#ifndef MBED_CONF_APP_ECHO_UDP_PORT
+//# define MBED_CONF_APP_ECHO_UDP_PORT 7
+# define MBED_CONF_APP_ECHO_UDP_PORT 5050
+#endif
+#ifndef MBED_CONF_APP_ECHO_TCP_PORT
+//# define MBED_CONF_APP_ECHO_TCP_PORT 7
+# define MBED_CONF_APP_ECHO_TCP_PORT 5055
 #endif
 
 #ifndef MBED_CONF_APP_NTP_SERVER
@@ -193,7 +198,7 @@ static void do_udp_echo(UDPSocket *sock, SocketAddress *hostAddress, int size) {
     TEST_ASSERT(recvData != NULL);
 
     // Retry this a few times, don't want to fail due to a flaky link
-    for (int x = 0; x < 3; x++) {
+    for (int x = 0; !success && (x < 3); x++) {
         tr_debug("Echo testing UDP packet size %d byte(s), try %d", size, x + 1);
         if ((sock->sendto(*hostAddress, (void*) sendData, size) == size) &&
             (sock->recvfrom(hostAddress, recvData, size) == size)) {
@@ -254,7 +259,7 @@ static void do_ntp(UbloxCellularInterfaceGeneric *pInterface)
 
     tr_debug("UDP: Values returned by NTP server:");
     for (size_t i = 0; i < sizeof(ntp_values) / sizeof(ntp_values[0]); ++i) {
-        tr_debug("\t[%02d] 0x%"PRIX32, i, common_read_32_bit((uint8_t*) &(ntp_values[i])));
+        tr_debug("\t[%02d] 0x%08x", i, (unsigned int) common_read_32_bit((uint8_t*) &(ntp_values[i])));
         if (i == 10) {
             const time_t timestamp = common_read_32_bit((uint8_t*) &(ntp_values[i])) - TIME1970;
             srand(timestamp);
@@ -323,7 +328,7 @@ void  test_udp_echo() {
     TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
 
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
-    hostAddress.set_port(MBED_CONF_APP_ECHO_PORT);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_UDP_PORT);
 
     tr_debug("UDP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
              hostAddress.get_ip_address(), hostAddress.get_port());
@@ -332,10 +337,10 @@ void  test_udp_echo() {
 
     sock.set_timeout(10000);
 
-    // Test min, max, and some random sizes inbetween
+    // Test min, max, and some random sizes in-between
     do_udp_echo(&sock, &hostAddress, 1);
     do_udp_echo(&sock, &hostAddress, MBED_CONF_APP_UDP_MAX_PACKET_SIZE);
-    for (unsigned int x = 0; x < 10; x++) {
+    for (int x = 0; x < 10; x++) {
         do_udp_echo(&sock, &hostAddress, (rand() % MBED_CONF_APP_UDP_MAX_PACKET_SIZE) + 1);
     }
 
@@ -353,20 +358,20 @@ void  test_tcp_echo() {
     TEST_ASSERT(pInterface->connect(MBED_CONF_APP_DEFAULT_PIN, MBED_CONF_APP_APN, MBED_CONF_APP_USERNAME, MBED_CONF_APP_PASSWORD) == 0);
 
     TEST_ASSERT(pInterface->gethostbyname(MBED_CONF_APP_ECHO_SERVER, &hostAddress) == 0);
-    hostAddress.set_port(MBED_CONF_APP_ECHO_PORT);
+    hostAddress.set_port(MBED_CONF_APP_ECHO_TCP_PORT);
 
     tr_debug("TCP: Server %s address: %s on port %d.", MBED_CONF_APP_ECHO_SERVER,
              hostAddress.get_ip_address(), hostAddress.get_port());
 
     TEST_ASSERT(sock.open(pInterface) == 0)
 
-    sock.set_timeout(10000);
+    sock.set_timeout(1000);
 
     TEST_ASSERT(sock.connect(hostAddress) == 0);
-    // Test min, max, and some random size in between
+    // Test min, max, and some random size in-between
     do_tcp_echo(&sock, 1);
     do_tcp_echo(&sock, MBED_CONF_APP_TCP_MAX_PACKET_SIZE);
-    for (unsigned int x = 0; x < 10; x++) {
+    for (int x = 0; x < 10; x++) {
         do_tcp_echo(&sock, (rand() % MBED_CONF_APP_TCP_MAX_PACKET_SIZE) + 1);
     }
 
@@ -517,7 +522,7 @@ void test_connect_local_instance_last_test() {
 // Setup the test environment
 utest::v1::status_t test_setup(const size_t number_of_cases) {
     // Setup Greentea with a timeout
-    GREENTEA_SETUP(540, "default_auto");
+    GREENTEA_SETUP(600, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 

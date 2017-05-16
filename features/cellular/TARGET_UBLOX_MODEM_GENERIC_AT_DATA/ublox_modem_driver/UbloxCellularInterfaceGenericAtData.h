@@ -216,14 +216,6 @@ public:
      */
     virtual const char *get_gateway();
 
-    /** Get the number of bytes pending for reading for this socket.
-     *
-     * @param handle    The socket handle.
-     * @return          The number of bytes pending on success, negative error
-     *                  code on failure.
-     */
-    virtual nsapi_size_or_error_t readable(nsapi_socket_t handle);
-
     /** Call back in case connection is lost.
      *
      * @param fptr     The function to call.
@@ -232,20 +224,38 @@ public:
 
 protected:
 
-    /** Infinite timeout.
+    /** Socket "unused" value.
      */
-    #define TIMEOUT_BLOCKING ((uint32_t) 0xFFFFFFFF)
+    #define SOCKET_UNUSED -1
 
-    /** Socket "unused" value
+    /** Socket timeout value in milliseconds.
+     * Note: the sockets layer above will retry the
+     * call to the functions here when they return NSAPI_ERROR_WOULD_BLOCK
+     * and the user has set a larger timeout or full blocking.
      */
-    #define SOCKET_UNUSED - 1
+    #define SOCKET_TIMEOUT 5000
+
+    /** The maximum number of bytes in a packet that can be written
+     * to the AT interface in one go.
+     * Note: this is NOT the same as the limitations on user packet
+     * sizes, it is for internal purposes only.
+     */
+    #define MAX_WRITE_SIZE 1024
+
+    /** The maximum number of bytes in a packet that can be read from
+     * from the AT interface in one go.
+     * Note: this is NOT the same as the limitations on user packet
+     * sizes, it is for internal purposes only.
+     */
+    #define MAX_READ_SIZE 1024
 
     /** Management structure for sockets.
      */
     typedef struct {
-        int modemHandle;
-        volatile bool tcpConnected;
+        int modem_handle;
         volatile nsapi_size_t pending;
+        void (*callback)(void *);
+        void *data;
     } SockCtrl;
 
     /** Sockets storage.
@@ -286,14 +296,14 @@ protected:
      *                 NSAPI_SECURITY_CHAP or NSAPI_SECURITY_UNKNOWN).
      * @return         True if successful, otherwise false.
      */
-    virtual bool activateProfile(const char* apn, const char* username,
-                                 const char* password, nsapi_security_t auth);
+    virtual bool activate_profile(const char* apn, const char* username,
+                                  const char* password, nsapi_security_t auth);
 
     /** Activate a profile using the existing external connection.
      *
      * @return true if successful, otherwise false.
      */
-    virtual bool activateProfileReuseExternal(void);
+    virtual bool activate_profile_reuse_external(void);
 
     /** Activate a profile based on connection ID.
      *
@@ -304,20 +314,20 @@ protected:
      * @param auth      The authentication method to use.
      * @return          True if successful, otherwise false.
      */
-    virtual bool activateProfileByCid(int cid, const char* apn, const char* username,
-                                      const char* password, nsapi_security_t auth);
+    virtual bool activate_profile_by_cid(int cid, const char* apn, const char* username,
+                                         const char* password, nsapi_security_t auth);
 
     /** Connect the on board IP stack of the modem.
      *
      * @return         True if successful, otherwise false.
      */
-    virtual bool connectModemStack();
+    virtual bool connect_modem_stack();
 
     /** Disconnect the on board IP stack of the modem.
      *
      * @return         True if successful, otherwise false.
      */
-    virtual bool disconnectModemStack();
+    virtual bool disconnect_modem_stack();
 
     /** Provide access to the NetworkStack object
      *
@@ -326,10 +336,6 @@ protected:
     virtual NetworkStack *get_stack();
 
 protected:
-
-    /** Socket timeout value
-     */
-    uint32_t _timeout;
 
     /** Open a socket.
      *
@@ -380,15 +386,8 @@ protected:
     /** Send data over a TCP socket.
      *
      *  The socket must be connected to a remote host. Returns the number of
-     *  bytes sent from the buffer.
-     *
-     *  PACKET SIZES: the maximum packet size that can be sent is limited
-     *  by the configuration value platform.buffered-serial-txbuf-size, which
-     *  defaults to 256.  The maximum UDP packet size that can be sent by
-     *  this class is platform.buffered-serial-txbuf-size - 36, so to
-     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
-     *  to add a target override where platform.buffered-serial-txbuf-size
-     *  is set to 1060.
+     *  bytes sent from the buffer.  There is no upper packet size limit other than
+     *  that implicit in internet communication.
      *
      *  @param handle   Socket handle.
      *  @param data     Buffer of data to send to the host.
@@ -406,11 +405,11 @@ protected:
      *
      *  PACKET SIZES: the maximum packet size that can be sent is limited
      *  by the configuration value platform.buffered-serial-txbuf-size, which
-     *  defaults to 256.  The maximum UDP packet size that can be sent by
-     *  this class is platform.buffered-serial-txbuf-size - 36, so to
-     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
-     *  to add a target override where platform.buffered-serial-txbuf-size
-     *  is set to 1060.
+     *  defaults to 256.  The maximum TCP packet size that can be sent by
+     *  this class is platform.buffered-serial-txbuf-size - 76 and a
+     *  maximum of 1024 (at the AT interface) so to allow sending of a 1024
+     *  byte UDP packet, edit your mbed_app.json to add a target override
+     *  where platform.buffered-serial-txbuf-size is set to 1100.
      *
      *  @param handle   Socket handle.
      *  @param address  The SocketAddress of the remote host.
@@ -425,15 +424,8 @@ protected:
     /** Receive data over a TCP socket.
      *
      *  The socket must be connected to a remote host. Returns the number of
-     *  bytes received into the buffer.
-     *
-     *  PACKET SIZES: the maximum packet size that can be received is limited
-     *  by the configuration value platform.buffered-serial-rxbuf-size, which
-     *  defaults to 256.  The maximum UDP packet size that can be sent by
-     *  this class is platform.buffered-serial-rxbuf-size - 36, so to
-     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
-     *  to add a target override where platform.buffered-serial-rxbuf-size
-     *  is set to 1060.
+     *  bytes received into the buffer.  There is no upper packet size limit
+     *  other than that implicit in internet communication.
      *
      *  @param handle   Socket handle.
      *  @param data     Destination buffer for data received from the host.
@@ -451,11 +443,11 @@ protected:
      *
      *  PACKET SIZES: the maximum packet size that can be received is limited
      *  by the configuration value platform.buffered-serial-rxbuf-size, which
-     *  defaults to 256.  The maximum UDP packet size that can be sent by
-     *  this class is platform.buffered-serial-rxbuf-size - 36, so to
-     *  allow sending of a 1024 byte UDP packet, edit your mbed_app.json
-     *  to add a target override where platform.buffered-serial-rxbuf-size
-     *  is set to 1060.
+     *  defaults to 256.  The maximum TCP packet size that can be received by
+     *  this class is platform.buffered-serial-rxbuf-size - 76 and a
+     *  maximum of 1024 (at the AT interface) so to allow reception of a 1024
+     *  byte TCP packet, edit your mbed_app.json to add a target override
+     *  where platform.buffered-serial-rxbuf-size is set to 1100.
      *
      *  @param handle   Socket handle.
      *  @param address  Destination for the source address or NULL.
@@ -466,6 +458,21 @@ protected:
      */
     virtual nsapi_size_or_error_t socket_recvfrom(nsapi_socket_t handle, SocketAddress *address,
                                                   void *data, nsapi_size_t size);
+
+    /** Register a callback on state change of the socket
+     *
+     *  The specified callback will be called on state changes such as when
+     *  the socket can recv/send/accept successfully and on when an error
+     *  occurs. The callback may also be called spuriously without reason.
+     *
+     *  The callback may be called in an interrupt context and should not
+     *  perform expensive operations such as recv/send calls.
+     *
+     *  @param handle   Socket handle
+     *  @param callback Function to call on state change
+     *  @param data     Argument to pass to callback
+     */
+    virtual void socket_attach(nsapi_socket_t handle, void (*callback)(void *), void *data);
 
     /** Listen for connections on a TCP socket
      *
@@ -498,21 +505,6 @@ protected:
      */
     virtual nsapi_error_t socket_accept(nsapi_socket_t server,
                                         nsapi_socket_t *handle, SocketAddress *address = 0);
-
-    /** Register a callback on state change of the socket
-     *
-     *  The specified callback will be called on state changes such as when
-     *  the socket can recv/send/accept successfully and on when an error
-     *  occurs. The callback may also be called spuriously without reason.
-     *
-     *  The callback may be called in an interrupt context and should not
-     *  perform expensive operations such as recv/send calls.
-     *
-     *  @param handle   Socket handle
-     *  @param callback Function to call on state change
-     *  @param data     Argument to pass to callback
-     */
-    virtual void socket_attach(nsapi_socket_t handle, void (*callback)(void *), void *data);
 
     /*  Set stack-specific socket options
      *
@@ -548,9 +540,6 @@ protected:
 
 private:
 
-    #define IS_PROFILE(p) (((p) >= 0) && (((unsigned int) p) < (sizeof(_httpProfiles)/sizeof(_httpProfiles[0]))) \
-                           && (_httpProfiles[p].modemHandle != HTTP_PROF_UNUSED))
-    #define TIMEOUT(t, ms)  ((ms != TIMEOUT_BLOCKING) && (ms < (uint32_t) t.read_ms()))
     #define stringify(a) str(a)
     #define str(a) #a
 
@@ -558,9 +547,12 @@ private:
     bool _sim_pin_check_change_pending_enabled_value;
     bool _sim_pin_change_pending;
     const char *_sim_pin_change_pending_new_pin_value;
-    SockCtrl * findSocket(int modemHandle = SOCKET_UNUSED);
-    void clearSocket(SockCtrl * socket);
-    int nsapiSecurityToModemSecurity(nsapi_security_t nsapiSecurity);
+    Thread event_thread;
+    void handle_event();
+    SockCtrl * find_socket(int modem_handle = SOCKET_UNUSED);
+    void clear_socket(SockCtrl * socket);
+    bool check_socket(SockCtrl * socket);
+    int nsapi_security_to_modem_security(nsapi_security_t nsapi_security);
     void UUSORD_URC();
     void UUSORF_URC();
     void UUSOCL_URC();

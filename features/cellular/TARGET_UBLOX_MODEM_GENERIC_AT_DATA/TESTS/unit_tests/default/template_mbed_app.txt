@@ -1,7 +1,7 @@
 {
     "config": {
         "platform": {
-            "help": "The platform for the cellular feature, e.g.UBLOX or MTS_DRAGONFLY",
+            "help": "The platform for the cellular feature, e.g. UBLOX or MTS_DRAGONFLY",
             "value": "UBLOX"
         },
         "buffer-size": {
@@ -39,8 +39,12 @@
             "help": "The URL string of the UDP/TCP echo server to use during testing",
             "value": "\"echo.u-blox.com\""
         },
-        "echo-port": {
-            "help": "The port to connect to on echo-server",
+        "echo-udp-port": {
+            "help": "The port to connect to on echo-server for UDP testing",
+            "value": 7
+        },
+        "echo-tcp-port": {
+            "help": "The port to connect to on echo-server for TCP testing",
             "value": 7
         },
         "ntp-server": {
@@ -67,8 +71,8 @@
             "platform.stdio-convert-newlines": true,
             "platform.stdio-baud-rate": 9600,
             "platform.default-serial-baud-rate": 115200, 
-            "platform.buffered-serial-txbuf-size": 544,
-            "platform.buffered-serial-rxbuf-size": 544,
+            "platform.buffered-serial-txbuf-size": 584,
+            "platform.buffered-serial-rxbuf-size": 584,
             "mbed-trace.enable": 1
         }
     }

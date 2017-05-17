@@ -697,7 +697,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
                         tr_debug("...copying %d bytes into buffer (from |%*.*s| to |%*.*s|)...",
                                  sz,
                                  (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1,
-                                 (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1 + sz - 5 - 2);
+                                 (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1 + sz - 5);
                         memcpy(buf, tmpBuf + 1, sz);
                     }
                     socket->pending -= read_blk;
@@ -797,7 +797,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
                         tr_debug("...copying %d bytes into buffer (from |%*.*s| to |%*.*s|)...",
                                  sz,
                                  (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1,
-                                 (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1 + sz - 5 - 2);
+                                 (sz > 5 ? 5 : sz), (sz > 5 ? 5 : sz), tmpBuf + 1 + sz - 5);
                         memcpy(buf, tmpBuf + 1, sz);
                     }
                     socket->pending -= read_blk;

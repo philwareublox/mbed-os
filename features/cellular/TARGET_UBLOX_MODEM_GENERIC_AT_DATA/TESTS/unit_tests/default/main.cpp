@@ -322,6 +322,7 @@ static void do_udp_echo_async(UDPSocket *sock, SocketAddress *host_address,
         }
     }
 
+    TEST_ASSERT(recv_size == size);
     TEST_ASSERT(!connection_has_gone_down);
 
     free (recv_data);

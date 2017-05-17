@@ -689,7 +689,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
                 if (tmpBuf != NULL) {
                     tr_debug("...reading %d bytes from handle %d...", sz, socket->modem_handle);
                     read_sz = _at->read(tmpBuf, sz + 2);
-                    tr_debug("Read returned %d, |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
+                    tr_debug("Read returned %d,  |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
                     if ((read_sz > 0) && (*tmpBuf == '\"') && *(tmpBuf + sz + 1) == '\"') {
                         if (sz > size) {
                             sz = size;
@@ -789,7 +789,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
                 if (tmpBuf != NULL) {
                     tr_debug("...reading %d bytes from handle %d...", sz, socket->modem_handle);
                     read_sz = _at->read(tmpBuf, sz + 2);
-                    tr_debug("Read returned %d, |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
+                    tr_debug("Read returned %d,  |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
                     if ((read_sz > 0) && (*tmpBuf == '\"') && *(tmpBuf + sz + 1) == '\"') {
                         if (sz > size) {
                             sz = size;

@@ -36,6 +36,7 @@ void ublox_board_init(void) {
     gpio_init_out_ex(&gpio, LED1,      1);
     gpio_init_out_ex(&gpio, LED2,      1);
     gpio_init_out_ex(&gpio, LED3,      1);
+    gpio_init_out_ex(&gpio, LED4,      1);
 }
 
 // End Of File

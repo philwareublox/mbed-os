@@ -239,7 +239,7 @@ protected:
      * call to the functions here when they return NSAPI_ERROR_WOULD_BLOCK
      * and the user has set a larger timeout or full blocking.
      */
-    #define SOCKET_TIMEOUT 5000
+    #define SOCKET_TIMEOUT 1000
 
     /** The maximum number of bytes in a packet that can be written
      * to the AT interface in one go.

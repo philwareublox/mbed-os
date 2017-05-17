@@ -569,16 +569,16 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_send(nsapi_soc
     bool success = true;
     const char *buf = (const char *) data;
     nsapi_size_t blk = MAX_WRITE_SIZE;
-    nsapi_size_t cnt = size;
+    nsapi_size_t count = size;
     SockCtrl *socket = (SockCtrl *) handle;
 
     tr_debug("socket_send(0x%08x, 0x%08x, %d)", (unsigned int) handle, (unsigned int) data, size);
 
     MBED_ASSERT (check_socket(socket));
 
-    while ((cnt > 0) && success) {
-        if (cnt < blk) {
-            blk = cnt;
+    while ((count > 0) && success) {
+        if (count < blk) {
+            blk = count;
         }
         LOCK();
 
@@ -594,11 +594,11 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_send(nsapi_soc
 
         UNLOCK();
         buf += blk;
-        cnt -= blk;
+        count -= blk;
     }
 
     if (success) {
-        nsapi_error_size = size - cnt;
+        nsapi_error_size = size - count;
     }
 
     return nsapi_error_size;
@@ -614,7 +614,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_sendto(nsapi_s
     bool success = true;
     const char *buf = (const char *) data;
     nsapi_size_t blk = MAX_WRITE_SIZE;
-    nsapi_size_t cnt = size;
+    nsapi_size_t count = size;
     SockCtrl *socket = (SockCtrl *) handle;
 
     tr_debug("socket_sendto(0x%8x, %s(:%d), 0x%08x, %d)", (unsigned int) handle,
@@ -622,9 +622,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_sendto(nsapi_s
 
     MBED_ASSERT (check_socket(socket));
 
-    while ((cnt > 0) && success) {
-        if (cnt < blk) {
-            blk = cnt;
+    while ((count > 0) && success) {
+        if (count < blk) {
+            blk = count;
         }
         LOCK();
 
@@ -643,11 +643,11 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_sendto(nsapi_s
 
         UNLOCK();
         buf += blk;
-        cnt -= blk;
+        count -= blk;
     }
 
     if (success) {
-        nsapi_error_size = size - cnt;
+        nsapi_error_size = size - count;
     }
 
     return nsapi_error_size;
@@ -662,7 +662,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
     bool success = true;
     char *buf = (char *) data;
     nsapi_size_t read_blk;
-    nsapi_size_t cnt = 0;
+    nsapi_size_t count = 0;
     char * tmpBuf = NULL;
     unsigned int sz, read_sz;
     Timer timer;
@@ -689,6 +689,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
                 if (tmpBuf != NULL) {
                     tr_debug("...reading %d bytes from handle %d...", sz, socket->modem_handle);
                     read_sz = _at->read(tmpBuf, sz + 2);
+                    tr_debug("Read returned %d, |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
                     if ((read_sz > 0) && (*tmpBuf == '\"') && *(tmpBuf + sz + 1) == '\"') {
                         if (sz > size) {
                             sz = size;
@@ -697,7 +698,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
                         memcpy(buf, tmpBuf + 1, sz);
                     }
                     socket->pending -= read_blk;
-                    cnt += sz;
+                    count += sz;
                     buf += sz;
                     size -= sz;
                     free(tmpBuf);
@@ -726,9 +727,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recv(nsapi_soc
     timer.stop();
 
     if (success) {
-        nsapi_error_size = cnt;
+        nsapi_error_size = count;
     }
-    tr_debug("socket_recv: %d \"%*.*s\"", cnt, cnt, cnt, buf - cnt);
+    tr_debug("socket_recv: %d \"%*.*s\"", count, count, count, buf - count);
 
     return nsapi_error_size;
 }
@@ -743,7 +744,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
     bool success = true;
     char *buf = (char *) data;
     nsapi_size_t read_blk;
-    nsapi_size_t cnt = 0;
+    nsapi_size_t count = 0;
     char ipAddress[NSAPI_IP_SIZE];
     int port;
     char * tmpBuf = NULL;
@@ -785,6 +786,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
                 if (tmpBuf != NULL) {
                     tr_debug("...reading %d bytes from handle %d...", sz, socket->modem_handle);
                     read_sz = _at->read(tmpBuf, sz + 2);
+                    tr_debug("Read returned %d, |%*.*s|", read_sz, sz + 2, sz + 2, tmpBuf);
                     if ((read_sz > 0) && (*tmpBuf == '\"') && *(tmpBuf + sz + 1) == '\"') {
                         if (sz > size) {
                             sz = size;
@@ -795,7 +797,7 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
                     socket->pending -= read_blk;
                     address->set_ip_address(ipAddress);
                     address->set_port(port);
-                    cnt += sz;
+                    count += sz;
                     buf += sz;
                     size = 0; // UDP packets must arrive all at once, so this means DONE.
                     free(tmpBuf);
@@ -824,9 +826,9 @@ nsapi_size_or_error_t UbloxCellularInterfaceGenericAtData::socket_recvfrom(nsapi
     timer.stop();
 
     if (success) {
-        nsapi_error_size = cnt;
+        nsapi_error_size = count;
     }
-    tr_debug("socket_recvfrom: %d \"%*.*s\"", cnt, cnt, cnt, buf - cnt);
+    tr_debug("socket_recvfrom: %d \"%*.*s\"", count, count, count, buf - count);
 
     return nsapi_error_size;
 }

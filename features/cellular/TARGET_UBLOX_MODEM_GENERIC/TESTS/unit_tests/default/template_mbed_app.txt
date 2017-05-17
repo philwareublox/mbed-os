@@ -65,7 +65,7 @@
         },
         "tcp-max-packet-size": {
             "help": "The maximum TCP packet size to use when testing",
-            "value": 1500
+            "value": 1072
         }
     },
     "target_overrides": {

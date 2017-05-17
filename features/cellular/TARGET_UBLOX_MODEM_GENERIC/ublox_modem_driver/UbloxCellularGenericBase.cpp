@@ -426,20 +426,26 @@ bool UbloxCellularGenericBase::nwk_registration(device_type dev)
         }
 
         if (atSuccess) {
-            // Now register
-            if (_at->send("AT+COPS=0") && _at->recv("OK")) {
-                // Query the registration status directly as well,
-                // just in case
-                if (_at->send("AT+CREG?") && _at->recv("OK")) {
-                    // Answer will be processed by URC
+            // See if we are already in automatic mode
+            if (_at->send("AT+COPS?") && _at->recv("+COPS: %d[,\n]", &status) &&
+                _at->recv("OK")) {
+                // If not, set it
+                if (status != 0) {
+                    _at->send("AT+COPS=0") && _at->recv("OK");
                 }
-                if (_at->send("AT+CGREG?") && _at->recv("OK")) {
+            }
+
+            // Query the registration status directly as well,
+            // just in case
+            if (_at->send("AT+CREG?") && _at->recv("OK")) {
+                // Answer will be processed by URC
+            }
+            if (_at->send("AT+CGREG?") && _at->recv("OK")) {
+                // Answer will be processed by URC
+            }
+            if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
+                if (_at->send("AT+CEREG?") && _at->recv("OK")) {
                     // Answer will be processed by URC
-                }
-                if ((dev == DEV_TOBY_L2) ||  (dev == DEV_MPCI_L2)) {
-                    if (_at->send("AT+CEREG?") && _at->recv("OK")) {
-                        // Answer will be processed by URC
-                    }
                 }
             }
 
